@@ -1,0 +1,48 @@
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from '@/context/AuthContext';
+import { PublicLayout } from '@/components/layout/PublicLayout';
+import { AdminLayout } from '@/components/layout/AdminLayout';
+import { ProtectedRoute } from '@/router/ProtectedRoute';
+import { Home } from '@/pages/Home';
+import { PrivacyPolicy } from '@/pages/PrivacyPolicy';
+import { ApplicationForm } from '@/pages/Application/ApplicationForm';
+import { Confirmation } from '@/pages/Application/Confirmation';
+import { Login } from '@/pages/admin/Login';
+import { Dashboard } from '@/pages/admin/Dashboard';
+import { CandidatesList } from '@/pages/admin/CandidatesList';
+import { CandidateDetail } from '@/pages/admin/CandidateDetail';
+import { Settings } from '@/pages/admin/Settings';
+import { NotFound } from '@/pages/NotFound';
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/candidatura" element={<ApplicationForm />} />
+            <Route path="/candidatura/confirmacao" element={<Confirmation />} />
+            <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+          </Route>
+
+          <Route path="/admin" element={<Login />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/admin/dashboard" element={<Dashboard />} />
+            <Route path="/admin/candidatos" element={<CandidatesList />} />
+            <Route path="/admin/candidatos/:id" element={<CandidateDetail />} />
+            <Route path="/admin/configuracoes" element={<Settings />} />
+          </Route>
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}

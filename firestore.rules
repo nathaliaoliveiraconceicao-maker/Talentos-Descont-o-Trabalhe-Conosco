@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// Regras de segurança do Firestore — Talentos Descontão
+//
+// Modelo de acesso:
+// - Candidatos (público, não autenticado) só podem CRIAR uma pré-candidatura.
+//   Não podem ler, alterar ou excluir nenhum dado.
+// - Administradores autenticados (com documento em /admins/{uid} e active == true)
+//   podem ler, atualizar status/avaliação e excluir dados de candidatos.
+// - Nenhum documento de administrador pode ser criado/editado pelo cliente:
+//   isso deve ser feito exclusivamente via Firebase Admin SDK (script createAdmin)
+//   ou pelo Console do Firebase, evitando auto-promoção de usuários a admin.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
+    }
+
+    // --- candidates ---------------------------------------------------
+    match /candidates/{candidateId} {
+      allow create: if
+        request.resource.data.status == 'nova_candidatura' &&
+        request.resource.data.consent.confirmsTruthfulness == true &&
+        request.resource.data.consent.authorizesDataProcessing == true &&
+        request.resource.data.contact.email is string &&
+        request.resource.data.contact.whatsapp is string;
+
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- statusHistory (log imutável) ----------------------------------
+    match /statusHistory/{entryId} {
+      allow create: if isAdmin() ||
+        (request.resource.data.changedBy == 'sistema' &&
+         request.resource.data.status == 'nova_candidatura');
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // --- evaluations (log imutável) -------------------------------------
+    match /evaluations/{entryId} {
+      allow create: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // --- admins ----------------------------------------------------------
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && request.auth.uid == adminId;
+      allow list: if isAdmin();
+      // Criação/edição somente via Firebase Admin SDK (fora do client SDK).
+      allow write: if false;
+    }
+
+    // --- scoringSettings (pesos de pontuação e retenção LGPD) -----------
+    match /scoringSettings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // --- jobAreas ----------------------------------------------------------
+    match /jobAreas/{areaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Nega tudo o mais por padrão.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
