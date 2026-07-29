@@ -1,10 +1,16 @@
-# Talentos — Plataforma SaaS de Recrutamento Multi-tenant
+# VagaHub — Todas as suas contratações em um só lugar.
 
-Plataforma de pré-candidatura multi-tenant (multiempresa), comercializada por
-assinatura. Cada cliente (ex.: **Supermercado Descontão**) tem seu próprio portal
-público de candidatura, painel de RH, candidatos, relatórios, critérios de pontuação
-e identidade visual — tudo isolado dos demais clientes, dentro de **uma única base de
-código, um único deploy e um único projeto Firebase**.
+Plataforma SaaS multi-tenant (multiempresa) de recrutamento, comercializada por
+assinatura: pré-candidatura, triagem, relatórios e banco de talentos, personalizável
+para qualquer negócio (varejo, serviços, escolas, indústria etc.). Cada cliente (ex.:
+**Supermercado Descontão**, primeiro tenant piloto) tem seu próprio portal público de
+candidatura, painel de RH, candidatos, relatórios, critérios de pontuação e identidade
+visual — tudo isolado dos demais clientes, dentro de **uma única base de código, um
+único deploy e um único projeto Firebase**.
+
+Identidade visual e nome do produto definidos em `vagahub_apresentacao.pdf`: paleta
+azul-marinho/azul vibrante/lilás/coral (sem verde/amarelo como base), tipografia
+Poppins (títulos) + Inter (interface), ícones lineares.
 
 > ⚠️ Este repositório foi desenvolvido com **dados fictícios**. Nenhuma informação real
 > de candidatos foi utilizada durante o desenvolvimento.
@@ -70,8 +76,8 @@ código, um único deploy e um único projeto Firebase**.
 
 ```
 ├── public/
-│   ├── favicon.svg
-│   ├── logo-placeholder.svg        # logo neutra da PLATAFORMA (não de um cliente)
+│   ├── favicon.svg                 # emblema VagaHub (só o ícone)
+│   ├── vagahub-logo.svg            # logo da PLATAFORMA (emblema + wordmark, não de um cliente)
 │   └── tenants/
 │       └── descontao-logo.svg      # logo do tenant Descontão
 ├── scripts/
@@ -147,7 +153,8 @@ npm install
    VITE_FIREBASE_STORAGE_BUCKET=...
    VITE_FIREBASE_MESSAGING_SENDER_ID=...
    VITE_FIREBASE_APP_ID=...
-   VITE_RECAPTCHA_SITE_KEY=...   # App Check — opcional, ver seção de Segurança
+   VITE_DEFAULT_RETENTION_MONTHS=24   # opcional, ver seção 10
+   VITE_RECAPTCHA_SITE_KEY=...        # App Check — opcional, ver seção de Segurança
    ```
 
 5. Publique as regras de segurança (requer o [Firebase CLI](https://firebase.google.com/docs/cli)):
@@ -302,6 +309,14 @@ A coleção `plans` (gerenciada em `/superadmin/planos`) define, por plano:
 O que **é** validado nesta versão:
 - Limite de usuários (`maxUsers`) — checado em `createTenantUser` antes de criar um
   novo usuário para o cliente.
+
+`VITE_DEFAULT_RETENTION_MONTHS` (variável de ambiente, opcional, padrão 24) define o
+prazo inicial de retenção do banco de talentos usado ao **semear um tenant novo**
+(`createTenant` em `src/lib/tenantApi.ts`) — não é um valor por tenant em si, é só o
+ponto de partida; cada cliente continua podendo ajustar o próprio prazo depois em
+`/app/configuracoes`. As demais variáveis herdadas de configurações antigas
+(`VITE_COMPANY_NAME`) não fazem mais sentido no modelo multi-tenant — o nome de cada
+empresa já é um campo do Firestore (`tenants/{tenantId}.name`), editável por tenant.
 
 O que **não** é validado automaticamente ainda (ver
 [Riscos e etapas pendentes](#riscos-e-etapas-pendentes)):

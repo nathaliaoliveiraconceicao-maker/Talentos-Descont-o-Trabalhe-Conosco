@@ -51,7 +51,7 @@ async function main() {
   const auth = getAuth();
   const db = getFirestore();
 
-  console.log('\n=== Criar/vincular usuário administrativo — Talentos Descontão ===\n');
+  console.log('\n=== Criar/vincular usuário administrativo (legado) — VagaHub ===\n');
 
   const name = readlineSync.question('Nome completo: ').trim();
   const email = readlineSync.questionEMail('E-mail de acesso: ').trim().toLowerCase();

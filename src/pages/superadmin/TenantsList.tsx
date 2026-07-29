@@ -90,7 +90,7 @@ export function TenantsList() {
           <h1 className="text-2xl font-bold text-neutral-800">Clientes</h1>
           <p className="text-sm text-neutral-500">{tenants.length} clientes cadastrados na plataforma.</p>
         </div>
-        <Button variant="danger" onClick={openModal}>
+        <Button variant="accent" onClick={openModal}>
           <Plus className="h-4 w-4" /> Cadastrar cliente
         </Button>
       </div>

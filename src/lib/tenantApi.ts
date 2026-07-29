@@ -116,7 +116,15 @@ export async function createTenant(input: CreateTenantInput): Promise<Tenant> {
   };
 
   await setDoc(doc(db, TENANTS_COLLECTION, input.slug), tenant);
-  await saveTenantSettings(input.slug, defaultTenantSettings, 'sistema');
+  // VITE_DEFAULT_RETENTION_MONTHS define o prazo inicial de retenção do
+  // banco de talentos para tenants novos; cada cliente pode sobrescrever o
+  // próprio prazo depois em /app/configuracoes.
+  const defaultRetentionMonths = Number(import.meta.env.VITE_DEFAULT_RETENTION_MONTHS) || defaultTenantSettings.talentPoolRetentionMonths;
+  await saveTenantSettings(
+    input.slug,
+    { ...defaultTenantSettings, talentPoolRetentionMonths: defaultRetentionMonths },
+    'sistema'
+  );
   await seedDefaultJobAreas(input.slug);
 
   return tenant;

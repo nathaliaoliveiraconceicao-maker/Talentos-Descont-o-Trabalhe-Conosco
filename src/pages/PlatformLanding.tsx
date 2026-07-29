@@ -14,7 +14,7 @@ export function PlatformLanding() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-50 px-4 text-center">
       <Logo className="h-14" />
       <div className="max-w-md">
-        <h1 className="text-2xl font-bold text-neutral-800">Plataforma de banco de talentos</h1>
+        <h1 className="text-2xl font-bold text-neutral-800">Todas as suas contratações em um só lugar.</h1>
         <p className="mt-2 text-sm text-neutral-500">
           Cada empresa cliente possui seu próprio portal de pré-candidatura, acessível pelo link
           exclusivo fornecido a ela (ex.: <code className="rounded bg-neutral-100 px-1.5 py-0.5">/descontao</code>).

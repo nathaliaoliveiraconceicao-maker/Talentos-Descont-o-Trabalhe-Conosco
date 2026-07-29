@@ -33,7 +33,7 @@ export function SuperAdminLayout() {
         <div className="flex h-16 items-center justify-between border-b border-neutral-200 px-5">
           <div>
             <Logo className="h-7" />
-            <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-brand-red-600">
+            <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-brand-navy-600">
               Painel da plataforma
             </p>
           </div>
@@ -50,7 +50,7 @@ export function SuperAdminLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-brand-red-100 text-brand-red-800'
+                    ? 'bg-brand-navy-100 text-brand-navy-800'
                     : 'text-neutral-600 hover:bg-neutral-100'
                 }`
               }

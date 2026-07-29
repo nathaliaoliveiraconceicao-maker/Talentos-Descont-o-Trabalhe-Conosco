@@ -1,9 +1,9 @@
 {
-  "name": "talentos-descontao",
+  "name": "vagahub",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Talentos Descontão — Trabalhe Conosco: portal de pré-candidatura do Supermercado Descontão.",
+  "description": "VagaHub: plataforma SaaS multiempresa para recrutamento, triagem, relatórios e banco de talentos — todas as suas contratações em um só lugar.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

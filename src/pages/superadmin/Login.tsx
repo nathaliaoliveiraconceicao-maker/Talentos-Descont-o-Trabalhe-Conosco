@@ -39,7 +39,7 @@ export function SuperAdminLogin() {
           </div>
           <Card>
             <CardBody className="flex flex-col items-center gap-3 py-8 text-center">
-              <span className="rounded-full bg-brand-red-100 p-3 text-brand-red-700">
+              <span className="rounded-full bg-brand-navy-100 p-3 text-brand-navy-700">
                 <ShieldOff className="h-5 w-5" />
               </span>
               <h1 className="text-lg font-bold text-neutral-800">Acesso não autorizado</h1>
@@ -79,7 +79,7 @@ export function SuperAdminLogin() {
         <Card>
           <CardBody className="flex flex-col gap-5 py-8">
             <div className="flex flex-col items-center gap-2 text-center">
-              <span className="rounded-full bg-brand-red-100 p-3 text-brand-red-700">
+              <span className="rounded-full bg-brand-navy-100 p-3 text-brand-navy-700">
                 <Building2 className="h-5 w-5" />
               </span>
               <h1 className="text-lg font-bold text-neutral-800">Painel da plataforma</h1>
@@ -112,7 +112,7 @@ export function SuperAdminLogin() {
                   {error}
                 </p>
               )}
-              <Button type="submit" fullWidth loading={submitting} variant="danger">
+              <Button type="submit" fullWidth loading={submitting} variant="accent">
                 <LogIn className="h-4 w-4" /> Entrar
               </Button>
             </form>

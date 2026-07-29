@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { Loader2 } from 'lucide-react';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'accent' | 'outline' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,7 +15,11 @@ const variantClasses: Record<Variant, string> = {
   primary:
     'bg-brand-blue-600 text-white hover:bg-brand-blue-700 focus-visible:ring-brand-blue-500 shadow-sm',
   secondary:
-    'bg-brand-yellow-400 text-brand-blue-950 hover:bg-brand-yellow-500 focus-visible:ring-brand-yellow-500 shadow-sm',
+    'bg-brand-lilac-500 text-white hover:bg-brand-lilac-600 focus-visible:ring-brand-lilac-500 shadow-sm',
+  // Cor de identidade do painel do superadmin (distinta do azul do painel do
+  // cliente) — ver src/components/layout/SuperAdminLayout.tsx.
+  accent:
+    'bg-brand-navy-600 text-white hover:bg-brand-navy-700 focus-visible:ring-brand-navy-500 shadow-sm',
   outline:
     'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 focus-visible:ring-brand-blue-500',
   ghost: 'text-neutral-700 hover:bg-neutral-100 focus-visible:ring-brand-blue-500',
