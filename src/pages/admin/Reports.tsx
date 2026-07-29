@@ -12,7 +12,9 @@ import {
   YAxis,
 } from 'recharts';
 import { AlertCircle, Download, FileDown, Inbox } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useTenantJobs } from '@/hooks/useTenantJobs';
 import { Spinner } from '@/components/ui/Spinner';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -66,7 +68,9 @@ function MiniPieChart({ data }: { data: { name: string; value: number }[] }) {
 }
 
 export function Reports() {
-  const { candidates, loading, error } = useCandidates();
+  const { tenantId } = useAuth();
+  const { candidates, loading, error } = useCandidates(tenantId ?? undefined);
+  const jobs = useTenantJobs(tenantId);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -101,7 +105,7 @@ export function Reports() {
   }
 
   const rates = calculateFunnelRates(filtered);
-  const byArea = candidatesByArea(filtered);
+  const byArea = candidatesByArea(filtered, jobs);
   const byNeighborhood = candidatesByNeighborhood(filtered);
   const byEducation = candidatesByEducation(filtered);
   const byExperience = candidatesByExperience(filtered);
@@ -111,9 +115,9 @@ export function Reports() {
   const byStatus = candidatesByStatusChart(filtered, STATUS_LABELS);
 
   const exportCsv = (includeRestricted: boolean) => {
-    const rows = candidatesToCsvRows(filtered, includeRestricted);
+    const rows = candidatesToCsvRows(filtered, jobs, includeRestricted);
     const suffix = includeRestricted ? 'completo' : 'padrao';
-    downloadCsv(`candidatos-descontao-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    downloadCsv(`candidatos-${tenantId}-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`, rows);
   };
 
   return (

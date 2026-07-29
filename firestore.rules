@@ -1,76 +1,186 @@
 rules_version = '2';
 
-// Regras de segurança do Firestore — Talentos Descontão
+// Regras de segurança do Firestore — Plataforma multi-tenant de Talentos
 //
-// Modelo de acesso:
-// - Candidatos (público, não autenticado) só podem CRIAR uma pré-candidatura.
-//   Não podem listar, ler, alterar ou excluir nenhum dado — nem o próprio.
-// - Administradores/RH autenticados (documento em /admins/{uid} com active == true
-//   e role em ['admin', 'rh']) podem ler, atualizar status/avaliação e excluir
-//   dados de candidatos, e acessar relatórios (mesma coleção "candidates").
-// - Nenhum documento de administrador pode ser criado/editado pelo cliente:
-//   isso deve ser feito exclusivamente via Firebase Admin SDK (script createAdmin)
-//   ou pelo Console do Firebase, evitando auto-promoção de usuários a admin.
+// Modelo de dados (ver README para detalhes):
+//   tenants/{tenantId}                          — tenantId == slug (sem necessidade de query pública)
+//   tenants/{tenantId}/users/{uid}               — usuários (owner/admin/rh/viewer) de um cliente
+//   tenants/{tenantId}/candidates/{candidateId}
+//   tenants/{tenantId}/jobs/{jobId}
+//   tenants/{tenantId}/evaluations/{id}
+//   tenants/{tenantId}/statusHistory/{id}
+//   tenants/{tenantId}/scoringSettings/default
+//   tenants/{tenantId}/settings/general
+//   tenants/{tenantId}/auditLogs/{id}
+//   platformAdmins/{uid}                         — superadmins da plataforma (fora de qualquer tenant)
+//   userIndex/{uid}                              — { tenantId } — índice uid -> tenant, para o login
+//   plans/{planId}
+//   migrations/{docId}                           — bookkeeping do script de migração (Admin SDK)
+//
+// Isolamento: um usuário só lê/altera dados de dentro de tenants/{tenantId}
+// quando possuir documento ATIVO em tenants/{tenantId}/users/{uid}. O
+// superadmin (platformAdmins/{uid} ativo) acessa qualquer tenant. A área
+// pública só pode CRIAR uma candidatura no tenant indicado — nunca ler,
+// listar, editar ou excluir candidaturas (nem as próprias).
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Funções auxiliares ------------------------------------------------
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function isSuperAdmin() {
       return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true &&
-        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'rh'];
+        exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.active == true;
     }
 
-    // --- candidates ---------------------------------------------------
-    match /candidates/{candidateId} {
-      allow create: if
-        request.resource.data.status == 'nova_candidatura' &&
-        request.resource.data.consent.confirmsTruthfulness == true &&
-        request.resource.data.consent.authorizesDataProcessing == true &&
-        request.resource.data.contact.email is string &&
-        request.resource.data.contact.whatsapp is string;
-
-      allow read, update, delete: if isAdmin();
+    function tenantUserData(tenantId) {
+      return get(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)).data;
     }
 
-    // --- statusHistory (log imutável) ----------------------------------
-    match /statusHistory/{entryId} {
-      allow create: if isAdmin() ||
-        (request.resource.data.changedBy == 'sistema' &&
-         request.resource.data.status == 'nova_candidatura');
-      allow read: if isAdmin();
-      allow update, delete: if false;
+    function isActiveTenantMember(tenantId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)) &&
+        tenantUserData(tenantId).active == true;
     }
 
-    // --- evaluations (log imutável) -------------------------------------
-    match /evaluations/{entryId} {
-      allow create: if isAdmin();
-      allow read: if isAdmin();
-      allow update, delete: if false;
+    function hasTenantRole(tenantId, roles) {
+      return isActiveTenantMember(tenantId) && tenantUserData(tenantId).role in roles;
     }
 
-    // --- admins ----------------------------------------------------------
-    match /admins/{adminId} {
-      allow get: if isSignedIn() && request.auth.uid == adminId;
-      allow list: if isAdmin();
-      // Criação/edição somente via Firebase Admin SDK (fora do client SDK).
-      allow write: if false;
+    function hasTenantAccess(tenantId) {
+      return isSuperAdmin() || isActiveTenantMember(tenantId);
     }
 
-    // --- scoringSettings (pesos de pontuação e retenção LGPD) -----------
-    match /scoringSettings/{docId} {
-      allow read, write: if isAdmin();
+    function canManageTenant(tenantId) {
+      return isSuperAdmin() || hasTenantRole(tenantId, ['owner', 'admin']);
     }
 
-    // --- jobAreas ----------------------------------------------------------
-    match /jobAreas/{areaId} {
+    function canOperateCandidates(tenantId) {
+      return isSuperAdmin() || hasTenantRole(tenantId, ['owner', 'admin', 'rh']);
+    }
+
+    // Bloqueia ações administrativas (escrita) quando a assinatura do
+    // cliente está suspensa/cancelada ou o cliente está inativo — mas
+    // continua permitindo leitura, e o superadmin nunca é bloqueado.
+    function tenantIsOperational(tenantId) {
+      let t = get(/databases/$(database)/documents/tenants/$(tenantId)).data;
+      return t.active == true && !(t.subscriptionStatus in ['suspended', 'canceled']);
+    }
+
+    // --- tenants/{tenantId} -------------------------------------------------
+    match /tenants/{tenantId} {
+      // Leitura de um tenant específico é pública (necessária para o portal
+      // público carregar nome/logo/cores pelo slug) — mas "list" (enumerar
+      // todos os tenants) é restrito ao superadmin, evitando descoberta de
+      // clientes por força bruta.
+      allow get: if true;
+      allow list: if isSuperAdmin();
+      allow create, delete: if isSuperAdmin();
+      // O próprio cliente (owner/admin) pode editar apenas os campos de
+      // identidade visual/contato — campos de negócio (plano, assinatura,
+      // ativo) são exclusivos do superadmin.
+      allow update: if isSuperAdmin() ||
+        (hasTenantRole(tenantId, ['owner', 'admin']) &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['name', 'legalName', 'logoUrl', 'primaryColor', 'secondaryColor',
+                     'email', 'phone', 'address', 'city', 'state', 'updatedAt']));
+
+      match /settings/{docId} {
+        allow get: if true; // textos do portal são públicos
+        allow write: if canManageTenant(tenantId);
+      }
+
+      match /jobs/{jobId} {
+        allow get, list: if true; // formulário público precisa ler as áreas
+        allow write: if canManageTenant(tenantId);
+      }
+
+      match /users/{uid} {
+        allow get: if isSuperAdmin() || request.auth.uid == uid || canManageTenant(tenantId);
+        allow list: if canManageTenant(tenantId);
+        // Criação/edição só via painel do superadmin (fluxo controlado em
+        // src/lib/superAdminApi.ts) ou Admin SDK — nunca pelo próprio usuário.
+        allow create, update, delete: if isSuperAdmin();
+      }
+
+      match /candidates/{candidateId} {
+        allow create: if
+          request.resource.data.tenantId == tenantId &&
+          request.resource.data.status == 'nova_candidatura' &&
+          request.resource.data.consent.confirmsTruthfulness == true &&
+          request.resource.data.consent.authorizesDataProcessing == true &&
+          request.resource.data.contact.email is string &&
+          request.resource.data.contact.whatsapp is string;
+        allow read: if hasTenantAccess(tenantId);
+        allow update, delete: if canOperateCandidates(tenantId) && (isSuperAdmin() || tenantIsOperational(tenantId));
+      }
+
+      match /statusHistory/{entryId} {
+        allow create: if
+          (canOperateCandidates(tenantId) && (isSuperAdmin() || tenantIsOperational(tenantId))) ||
+          (request.resource.data.changedBy == 'sistema' && request.resource.data.status == 'nova_candidatura');
+        allow read: if hasTenantAccess(tenantId);
+        allow update, delete: if false; // log imutável
+      }
+
+      match /evaluations/{entryId} {
+        allow create: if canOperateCandidates(tenantId) && (isSuperAdmin() || tenantIsOperational(tenantId));
+        allow read: if hasTenantAccess(tenantId);
+        allow update, delete: if false; // log imutável
+      }
+
+      match /scoringSettings/{docId} {
+        allow read: if true; // o formulário público calcula a pontuação no envio
+        allow write: if canManageTenant(tenantId);
+      }
+
+      match /auditLogs/{logId} {
+        allow create: if hasTenantAccess(tenantId);
+        allow read: if canManageTenant(tenantId);
+        allow update, delete: if false; // log imutável
+      }
+    }
+
+    // --- platformAdmins/{uid} (superadmins) ---------------------------------
+    match /platformAdmins/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list: if isSuperAdmin();
+      allow write: if false; // apenas via script administrativo (Admin SDK)
+    }
+
+    // --- userIndex/{uid} (uid -> tenantId, para o login) --------------------
+    match /userIndex/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow write: if isSuperAdmin();
+    }
+
+    // --- plans/{planId} ------------------------------------------------------
+    match /plans/{planId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSuperAdmin();
     }
+
+    // --- migrations/{docId} (bookkeeping do script de migração) -------------
+    match /migrations/{docId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // apenas via script administrativo (Admin SDK)
+    }
+
+    // --- Coleções legadas (pré multi-tenant) --------------------------------
+    // Preservadas apenas como origem de dados para o script de migração
+    // (que usa o Admin SDK e, portanto, não passa por estas regras). O
+    // aplicativo não lê/escreve mais nestas coleções — acesso pelo cliente
+    // fica bloqueado até a remoção manual, após a migração ser concluída.
+    match /admins/{adminId} { allow read, write: if false; }
+    match /candidates/{candidateId} { allow read, write: if false; }
+    match /statusHistory/{entryId} { allow read, write: if false; }
+    match /evaluations/{entryId} { allow read, write: if false; }
+    match /scoringSettings/{docId} { allow read, write: if false; }
+    match /jobAreas/{areaId} { allow read, write: if false; }
 
     // Nega tudo o mais por padrão.
     match /{document=**} {

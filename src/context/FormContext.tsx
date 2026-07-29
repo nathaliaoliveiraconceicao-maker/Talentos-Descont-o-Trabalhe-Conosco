@@ -2,9 +2,6 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { emptyCandidateFormData, type CandidateFormData } from '@/types/candidate';
 
-const STORAGE_KEY = 'descontao:pre-candidatura:rascunho';
-const STEP_STORAGE_KEY = 'descontao:pre-candidatura:etapa';
-
 export const TOTAL_STEPS = 9;
 
 interface FormContextValue {
@@ -21,9 +18,17 @@ interface FormContextValue {
 
 const FormContext = createContext<FormContextValue | undefined>(undefined);
 
-export function FormProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useLocalStorage<CandidateFormData>(STORAGE_KEY, emptyCandidateFormData);
-  const [currentStep, setCurrentStep] = useLocalStorage<number>(STEP_STORAGE_KEY, 1);
+interface FormProviderProps {
+  tenantSlug: string;
+  children: ReactNode;
+}
+
+export function FormProvider({ tenantSlug, children }: FormProviderProps) {
+  const [data, setData] = useLocalStorage<CandidateFormData>(
+    `${tenantSlug}:pre-candidatura:rascunho`,
+    emptyCandidateFormData
+  );
+  const [currentStep, setCurrentStep] = useLocalStorage<number>(`${tenantSlug}:pre-candidatura:etapa`, 1);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
   const updateSection: FormContextValue['updateSection'] = (section, value) => {

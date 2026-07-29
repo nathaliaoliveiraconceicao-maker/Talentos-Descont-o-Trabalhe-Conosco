@@ -1,6 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#146c94"/>
-  <path d="M18 26h28l-3 22a4 4 0 0 1-4 3.4H25a4 4 0 0 1-4-3.4l-3-22Z" fill="#ffffff"/>
-  <path d="M24 26v-4a8 8 0 0 1 16 0v4" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="32" cy="36" r="3.5" fill="#d32f2b"/>
+<!-- Favicon VagaHub: só o emblema (sem wordmark), ver public/vagahub-logo.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 88">
+  <defs>
+    <linearGradient id="vagahubBadgeFavicon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4169e1" />
+      <stop offset="1" stop-color="#7c5cfc" />
+    </linearGradient>
+  </defs>
+  <rect width="88" height="88" rx="20" fill="url(#vagahubBadgeFavicon)" />
+  <path d="M20 46 L34 62 L50 30" fill="none" stroke="#ffffff" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M50 30 L66 16" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" />
+  <circle cx="56" cy="26" r="4" fill="none" stroke="#ffffff" stroke-width="3" />
+  <circle cx="66" cy="16" r="5" fill="#ffffff" />
 </svg>

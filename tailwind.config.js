@@ -5,31 +5,63 @@ export default {
     extend: {
       colors: {
         brand: {
+          // Paleta oficial VagaHub (ver vagahub_apresentacao.pdf): azul
+          // vibrante como cor de ação primária, azul-marinho para chrome
+          // escuro/institucional, lilás para acentos de interface SaaS e
+          // coral para avisos/destaques. Verde e amarelo (abaixo) seguem
+          // existindo só para semântica de status (aprovado/nota), nunca
+          // como cor de marca — conforme diretriz do PDF.
           blue: {
-            50: '#eaf6fb',
-            100: '#cdeaf5',
-            200: '#9ad4eb',
-            300: '#62b9db',
-            400: '#3aa0c9',
-            500: '#1f84b0',
-            600: '#146c94',
-            700: '#125877',
-            800: '#124862',
-            900: '#0f3a4f',
-            950: '#082433',
+            50: '#e4eafb',
+            100: '#c9d4f6',
+            200: '#aebff2',
+            300: '#92a9ee',
+            400: '#7794ea',
+            500: '#5c7ee5',
+            600: '#4169e1',
+            700: '#3353b1',
+            800: '#253c81',
+            900: '#182652',
+            950: '#0a1022',
+          },
+          navy: {
+            50: '#dee0e7',
+            100: '#bdc1ce',
+            200: '#9ca2b6',
+            300: '#7a829d',
+            400: '#596385',
+            500: '#38446c',
+            600: '#172554',
+            700: '#121d42',
+            800: '#0d1530',
+            900: '#080d1e',
+            950: '#03060d',
+          },
+          lilac: {
+            50: '#ece8ff',
+            100: '#dad0fe',
+            200: '#c7b9fe',
+            300: '#b4a2fd',
+            400: '#a18bfd',
+            500: '#8f73fc',
+            600: '#7c5cfc',
+            700: '#6248c6',
+            800: '#473591',
+            900: '#2d215b',
+            950: '#130e26',
           },
           red: {
-            50: '#fdeeee',
-            100: '#fbd4d3',
-            200: '#f5a5a3',
-            300: '#ec7370',
-            400: '#e14b47',
-            500: '#d32f2b',
-            600: '#b8221f',
-            700: '#951c1a',
-            800: '#791a19',
-            900: '#631918',
-            950: '#360a09',
+            50: '#ffeaea',
+            100: '#ffd5d5',
+            200: '#ffc0c0',
+            300: '#ffaaaa',
+            400: '#ff9595',
+            500: '#ff8080',
+            600: '#ff6b6b',
+            700: '#c95454',
+            800: '#933e3e',
+            900: '#5c2727',
+            950: '#261010',
           },
           green: {
             50: '#eefbf1',
@@ -61,6 +93,7 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+        heading: ['Poppins', 'Inter', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
       },
       boxShadow: {
         card: '0 2px 10px 0 rgb(15 58 79 / 0.06), 0 1px 2px 0 rgb(15 58 79 / 0.04)',

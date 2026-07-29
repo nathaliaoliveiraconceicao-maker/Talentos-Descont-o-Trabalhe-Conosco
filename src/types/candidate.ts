@@ -1,19 +1,12 @@
 export type ContactPreference = 'whatsapp' | 'ligacao' | 'email';
 
-export type JobAreaId =
-  | 'ajudante_acougue'
-  | 'acougueiro'
-  | 'padeiro'
-  | 'ajudante_padaria'
-  | 'repositor_hortifruti'
-  | 'repositor'
-  | 'operador_caixa'
-  | 'fiscal_caixa'
-  | 'administrativo'
-  | 'atendente_frios'
-  | 'conferente'
-  | 'estoquista'
-  | 'outra';
+/**
+ * ID de uma área de interesse (cargo). Antes da multi-tenancy era uma union
+ * fixa com os cargos do Descontão; agora cada tenant define as suas próprias
+ * áreas em tenants/{tenantId}/jobs, então o tipo é uma string livre (o ID do
+ * documento correspondente em "jobs", ou "outra" para a opção coringa).
+ */
+export type JobAreaId = string;
 
 export type CandidateStatus =
   | 'nova_candidatura'
@@ -181,6 +174,7 @@ export interface CandidateEvaluation {
 
 export interface Candidate {
   id: string;
+  tenantId: string;
   protocol: string;
   personal: PersonalData;
   contact: ContactData;
@@ -201,7 +195,7 @@ export interface Candidate {
 
 export type CandidateFormData = Omit<
   Candidate,
-  'id' | 'protocol' | 'status' | 'score' | 'scoreBreakdown' | 'createdAt' | 'updatedAt' | 'evaluation'
+  'id' | 'tenantId' | 'protocol' | 'status' | 'score' | 'scoreBreakdown' | 'createdAt' | 'updatedAt' | 'evaluation'
 >;
 
 export const emptyCandidateFormData: CandidateFormData = {

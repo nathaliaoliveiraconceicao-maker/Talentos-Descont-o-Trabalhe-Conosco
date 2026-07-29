@@ -3,11 +3,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -26,9 +28,17 @@ import type {
 } from '@/types/candidate';
 import type { ScoringWeights } from '@/types/admin';
 
-const CANDIDATES_COLLECTION = 'candidates';
-const STATUS_HISTORY_COLLECTION = 'statusHistory';
-const EVALUATIONS_COLLECTION = 'evaluations';
+const TENANTS_COLLECTION = 'tenants';
+
+function candidatesCol(tenantId: string) {
+  return collection(db, TENANTS_COLLECTION, tenantId, 'candidates');
+}
+function statusHistoryCol(tenantId: string) {
+  return collection(db, TENANTS_COLLECTION, tenantId, 'statusHistory');
+}
+function evaluationsCol(tenantId: string) {
+  return collection(db, TENANTS_COLLECTION, tenantId, 'evaluations');
+}
 
 export const RESUME_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const RESUME_ACCEPTED_TYPES = [
@@ -43,31 +53,69 @@ export const RESUME_ACCEPTED_EXTENSIONS = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
 /** Janela usada para alertar sobre candidaturas duplicadas com o mesmo contato. */
 const DUPLICATE_WINDOW_HOURS = 48;
 
+const SUBMISSIONS_STORAGE_KEY = 'talentos:candidaturas-recentes';
+
+interface RecentSubmission {
+  tenantId: string;
+  emailLower: string;
+  digits: string;
+  submittedAt: number;
+}
+
+function readRecentSubmissions(): RecentSubmission[] {
+  try {
+    const raw = window.localStorage.getItem(SUBMISSIONS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as RecentSubmission[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Verificação de candidatura duplicada — feita no NAVEGADOR (localStorage),
+ * não consultando o Firestore. Isso é proposital: pelas Firestore Rules,
+ * candidatos (não autenticados) só podem CRIAR uma pré-candidatura, nunca
+ * ler/listar candidaturas (nem as próprias) — isso evita que qualquer
+ * visitante consiga enumerar dados de outros candidatos. Como consequência,
+ * esta checagem cobre o caso mais comum (reenvio duplicado no mesmo
+ * navegador/dispositivo, ex.: duplo clique ou reenvio após atualizar a
+ * página) mas não detecta duplicidade entre dispositivos diferentes — isso
+ * exigiria uma função de backend (Cloud Function) com acesso privilegiado
+ * ao Firestore, fora do escopo deste projeto (ver README).
+ */
 export async function checkRecentDuplicate(
+  tenantId: string,
   email: string,
   whatsapp: string
 ): Promise<boolean> {
   const digits = onlyDigits(whatsapp);
   const emailLower = email.trim().toLowerCase();
-
-  const [byEmail, byPhone] = await Promise.all([
-    getDocs(query(collection(db, CANDIDATES_COLLECTION), where('contact.email', '==', emailLower))),
-    getDocs(query(collection(db, CANDIDATES_COLLECTION), where('contact.whatsappDigits', '==', digits))),
-  ]);
-
   const cutoff = Date.now() - DUPLICATE_WINDOW_HOURS * 60 * 60 * 1000;
-  const isRecent = (createdAt: string) => new Date(createdAt).getTime() > cutoff;
 
-  const hasRecentEmail = byEmail.docs.some((d) => isRecent(d.data().createdAt));
-  const hasRecentPhone = byPhone.docs.some((d) => isRecent(d.data().createdAt));
-
-  return hasRecentEmail || hasRecentPhone;
+  return readRecentSubmissions().some(
+    (s) => s.tenantId === tenantId && s.submittedAt > cutoff && (s.emailLower === emailLower || s.digits === digits)
+  );
 }
 
-export async function uploadResume(file: File): Promise<ResumeFile> {
-  const timestamp = Date.now();
+function recordSubmission(tenantId: string, email: string, whatsapp: string): void {
+  const cutoff = Date.now() - DUPLICATE_WINDOW_HOURS * 60 * 60 * 1000;
+  const existing = readRecentSubmissions().filter((s) => s.submittedAt > cutoff);
+  existing.push({
+    tenantId,
+    emailLower: email.trim().toLowerCase(),
+    digits: onlyDigits(whatsapp),
+    submittedAt: Date.now(),
+  });
+  try {
+    window.localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(existing));
+  } catch {
+    // armazenamento indisponível (ex.: modo privado); ignora silenciosamente
+  }
+}
+
+async function uploadResume(tenantId: string, candidateId: string, file: File): Promise<ResumeFile> {
   const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-  const storagePath = `resumes/${timestamp}-${safeName}`;
+  const storagePath = `tenants/${tenantId}/candidates/${candidateId}/resume/${safeName}`;
   const storageRef = ref(storage, storagePath);
   await uploadBytes(storageRef, file, { contentType: file.type });
   const fileUrl = await getDownloadURL(storageRef);
@@ -83,15 +131,24 @@ export async function uploadResume(file: File): Promise<ResumeFile> {
 }
 
 export async function submitCandidate(
+  tenantId: string,
   data: CandidateFormData,
+  resumeFile: File | null,
   weights?: ScoringWeights
 ): Promise<{ id: string; protocol: string }> {
-  const { total, breakdown } = calculateScore(data, weights);
+  // Gera o ID do documento antecipadamente para que o currículo (se houver)
+  // possa ser enviado para tenants/{tenantId}/candidates/{candidateId}/resume/...
+  const candidateRef = doc(candidatesCol(tenantId));
+  const resume = resumeFile ? await uploadResume(tenantId, candidateRef.id, resumeFile) : null;
+
+  const dataWithResume: CandidateFormData = { ...data, resume };
+  const { total, breakdown } = calculateScore(dataWithResume, weights);
   const protocol = generateProtocol();
   const nowIso = new Date().toISOString();
 
   const payload = {
-    ...data,
+    ...dataWithResume,
+    tenantId,
     contact: {
       ...data.contact,
       email: data.contact.email.trim().toLowerCase(),
@@ -109,17 +166,19 @@ export async function submitCandidate(
     },
   };
 
-  const docRef = await addDoc(collection(db, CANDIDATES_COLLECTION), payload);
+  await setDoc(candidateRef, payload);
 
-  await addDoc(collection(db, STATUS_HISTORY_COLLECTION), {
-    candidateId: docRef.id,
+  await addDoc(statusHistoryCol(tenantId), {
+    candidateId: candidateRef.id,
     status: 'nova_candidatura',
     changedAt: nowIso,
     changedBy: 'sistema',
     note: 'Candidatura recebida pelo formulário público.',
   });
 
-  return { id: docRef.id, protocol };
+  recordSubmission(tenantId, data.contact.email, data.contact.whatsapp);
+
+  return { id: candidateRef.id, protocol };
 }
 
 function timestampToIso(value: unknown): string {
@@ -128,54 +187,53 @@ function timestampToIso(value: unknown): string {
   return new Date().toISOString();
 }
 
-export async function listCandidates(): Promise<Candidate[]> {
-  const snapshot = await getDocs(
-    query(collection(db, CANDIDATES_COLLECTION), orderBy('createdAt', 'desc'))
-  );
+export async function listCandidates(tenantId: string): Promise<Candidate[]> {
+  const snapshot = await getDocs(query(candidatesCol(tenantId), orderBy('createdAt', 'desc')));
   return snapshot.docs.map((d) => {
     const data = d.data();
     return {
       id: d.id,
       ...data,
+      tenantId,
       createdAt: timestampToIso(data.createdAt),
       updatedAt: timestampToIso(data.updatedAt),
     } as Candidate;
   });
 }
 
-export async function getCandidate(id: string): Promise<Candidate | null> {
-  const snap = await getDoc(doc(db, CANDIDATES_COLLECTION, id));
+export async function getCandidate(tenantId: string, id: string): Promise<Candidate | null> {
+  const snap = await getDoc(doc(db, TENANTS_COLLECTION, tenantId, 'candidates', id));
   if (!snap.exists()) return null;
   const data = snap.data();
   return {
     id: snap.id,
     ...data,
+    tenantId,
     createdAt: timestampToIso(data.createdAt),
     updatedAt: timestampToIso(data.updatedAt),
   } as Candidate;
 }
 
-export async function getStatusHistory(candidateId: string): Promise<StatusHistoryEntry[]> {
-  const snapshot = await getDocs(
-    query(collection(db, STATUS_HISTORY_COLLECTION), where('candidateId', '==', candidateId))
-  );
+export async function getStatusHistory(tenantId: string, candidateId: string): Promise<StatusHistoryEntry[]> {
+  const snapshot = await getDocs(query(statusHistoryCol(tenantId), where('candidateId', '==', candidateId)));
   return snapshot.docs
     .map((d) => ({ id: d.id, ...d.data() } as StatusHistoryEntry & { candidateId: string }))
     .sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime());
 }
 
 export async function updateCandidateStatus(
+  tenantId: string,
   candidateId: string,
   status: CandidateStatus,
   changedBy: string,
   options?: { note?: string; changedByUid?: string; previousStatus?: CandidateStatus | null }
 ): Promise<void> {
   const nowIso = new Date().toISOString();
-  await updateDoc(doc(db, CANDIDATES_COLLECTION, candidateId), {
+  await updateDoc(doc(db, TENANTS_COLLECTION, tenantId, 'candidates', candidateId), {
     status,
     updatedAt: nowIso,
   });
-  await addDoc(collection(db, STATUS_HISTORY_COLLECTION), {
+  await addDoc(statusHistoryCol(tenantId), {
     candidateId,
     status,
     previousStatus: options?.previousStatus ?? null,
@@ -198,16 +256,17 @@ export interface EvaluationUpdate {
 }
 
 export async function updateCandidateEvaluation(
+  tenantId: string,
   candidateId: string,
   evaluation: EvaluationUpdate,
   updatedBy: string
 ): Promise<void> {
   const nowIso = new Date().toISOString();
-  await updateDoc(doc(db, CANDIDATES_COLLECTION, candidateId), {
+  await updateDoc(doc(db, TENANTS_COLLECTION, tenantId, 'candidates', candidateId), {
     evaluation,
     updatedAt: nowIso,
   });
-  await addDoc(collection(db, EVALUATIONS_COLLECTION), {
+  await addDoc(evaluationsCol(tenantId), {
     candidateId,
     ...evaluation,
     updatedBy,
@@ -215,8 +274,14 @@ export async function updateCandidateEvaluation(
   });
 }
 
-export async function deleteCandidateData(candidateId: string): Promise<void> {
-  const candidate = await getCandidate(candidateId);
+/** Contagem eficiente (sem baixar os documentos) — usada no painel do superadmin. */
+export async function countCandidatesForTenant(tenantId: string): Promise<number> {
+  const snapshot = await getCountFromServer(candidatesCol(tenantId));
+  return snapshot.data().count;
+}
+
+export async function deleteCandidateData(tenantId: string, candidateId: string): Promise<void> {
+  const candidate = await getCandidate(tenantId, candidateId);
   if (candidate?.resume?.storagePath) {
     try {
       await deleteObject(ref(storage, candidate.resume.storagePath));
@@ -224,5 +289,5 @@ export async function deleteCandidateData(candidateId: string): Promise<void> {
       // arquivo pode já não existir; segue com a exclusão dos dados
     }
   }
-  await deleteDoc(doc(db, CANDIDATES_COLLECTION, candidateId));
+  await deleteDoc(doc(db, TENANTS_COLLECTION, tenantId, 'candidates', candidateId));
 }

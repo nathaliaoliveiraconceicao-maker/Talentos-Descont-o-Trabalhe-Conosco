@@ -1,4 +1,5 @@
 import { useCandidateForm } from '@/context/FormContext';
+import { useTenant } from '@/context/TenantContext';
 import { FormField } from '@/components/ui/FormField';
 import { Textarea } from '@/components/ui/Textarea';
 import type { Errors } from '../validation';
@@ -6,7 +7,7 @@ import { PROFILE_MAX_LENGTH } from '../validation';
 import { StepShell } from './StepShell';
 
 const QUESTIONS: { key: keyof import('@/types/candidate').ProfileData; label: string }[] = [
-  { key: 'whyWorkHere', label: 'Por que você gostaria de trabalhar no Supermercado Descontão?' },
+  { key: 'whyWorkHere', label: 'Por que você gostaria de trabalhar aqui?' },
   { key: 'mainQualities', label: 'Quais são suas principais qualidades profissionais?' },
   { key: 'reactionToFeedback', label: 'Como você reage ao receber uma orientação ou correção?' },
   { key: 'helpingColleagueStory', label: 'Conte uma situação em que precisou ajudar um colega.' },
@@ -16,6 +17,7 @@ const QUESTIONS: { key: keyof import('@/types/candidate').ProfileData; label: st
 ];
 
 export function Step7Profile({ errors }: { errors: Errors }) {
+  const { tenant } = useTenant();
   const { data, updateSection } = useCandidateForm();
   const { profile } = data;
 
@@ -23,9 +25,13 @@ export function Step7Profile({ errors }: { errors: Errors }) {
     updateSection('profile', { ...profile, [key]: value });
   };
 
+  const questions = QUESTIONS.map((q) =>
+    q.key === 'whyWorkHere' ? { ...q, label: `Por que você gostaria de trabalhar na ${tenant.name}?` } : q
+  );
+
   return (
     <StepShell title="Perfil profissional" description="Queremos te conhecer um pouco melhor.">
-      {QUESTIONS.map((q) => (
+      {questions.map((q) => (
         <FormField key={q.key} label={q.label} htmlFor={q.key} required error={errors[`profile.${q.key}`]}>
           <Textarea
             id={q.key}

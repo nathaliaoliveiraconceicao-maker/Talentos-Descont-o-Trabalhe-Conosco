@@ -1,16 +1,17 @@
 /**
- * Área reservada para a logomarca oficial do Supermercado Descontão.
- * Troque o arquivo em public/logo-placeholder.svg pela logo oficial,
- * ou aponte "src" para um novo arquivo dentro de /public.
+ * Logo da PLATAFORMA (VagaHub) — usada no login/painel /app/* (antes de
+ * resolver o tenant do usuário) e em /superadmin/*. Para a logo de um tenant
+ * específico nas páginas públicas "/{slug}/...", use <TenantLogo /> em vez
+ * deste.
  */
 export function Logo({ className = 'h-12' }: { className?: string }) {
   return (
     <img
-      src="/logo-placeholder.svg"
-      alt="Supermercado Descontão"
+      src="/vagahub-logo.svg"
+      alt="VagaHub"
       className={`w-auto ${className}`}
-      width={480}
-      height={170}
+      width={420}
+      height={100}
     />
   );
 }

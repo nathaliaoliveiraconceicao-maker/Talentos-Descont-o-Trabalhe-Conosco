@@ -1,30 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Archive, LayoutDashboard, LineChart, LogOut, Menu, Settings, Users, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { getTenant } from '@/lib/tenantApi';
+import { TENANT_ROLE_LABELS } from '@/types/admin';
 import { Logo } from './Logo';
 
 const NAV_ITEMS = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/admin/candidatos', label: 'Candidatos', icon: Users },
-  { to: '/admin/relatorios', label: 'Relatórios', icon: LineChart },
-  { to: '/admin/banco-de-talentos', label: 'Banco de Talentos', icon: Archive },
-  { to: '/admin/configuracoes', label: 'Configurações', icon: Settings },
+  { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/app/candidatos', label: 'Candidatos', icon: Users },
+  { to: '/app/relatorios', label: 'Relatórios', icon: LineChart },
+  { to: '/app/banco-de-talentos', label: 'Banco de Talentos', icon: Archive },
+  { to: '/app/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  rh: 'RH',
-};
-
 export function AdminLayout() {
-  const { admin, user, logout } = useAuth();
+  const { admin, user, tenantId, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [tenantName, setTenantName] = useState('');
+
+  useEffect(() => {
+    if (!tenantId) return;
+    getTenant(tenantId).then((t) => setTenantName(t?.name ?? ''));
+  }, [tenantId]);
 
   const handleLogout = async () => {
     await logout();
-    navigate('/admin/login', { replace: true });
+    navigate('/app/login', { replace: true });
   };
 
   const displayName = admin?.name ?? user?.email ?? 'Usuário';
@@ -37,7 +40,10 @@ export function AdminLayout() {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-neutral-200 px-5">
-          <Logo className="h-8" />
+          <div>
+            <Logo className="h-7" />
+            {tenantName && <p className="mt-0.5 truncate text-xs font-semibold text-neutral-500">{tenantName}</p>}
+          </div>
           <button className="lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fechar menu">
             <X className="h-5 w-5" />
           </button>
@@ -64,7 +70,7 @@ export function AdminLayout() {
         <div className="absolute bottom-0 left-0 right-0 border-t border-neutral-200 p-4">
           <p className="truncate text-sm font-medium text-neutral-700">{displayName}</p>
           {admin?.role && (
-            <p className="text-xs text-neutral-400">{ROLE_LABELS[admin.role] ?? admin.role}</p>
+            <p className="text-xs text-neutral-400">{TENANT_ROLE_LABELS[admin.role] ?? admin.role}</p>
           )}
           <button
             onClick={handleLogout}
@@ -94,7 +100,7 @@ export function AdminLayout() {
             <span className="font-medium text-neutral-800">{displayName}</span>
             {admin?.role && (
               <span className="rounded-full bg-brand-blue-100 px-2.5 py-0.5 text-xs font-semibold text-brand-blue-800">
-                {ROLE_LABELS[admin.role] ?? admin.role}
+                {TENANT_ROLE_LABELS[admin.role] ?? admin.role}
               </span>
             )}
           </div>

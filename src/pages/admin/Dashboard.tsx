@@ -25,7 +25,9 @@ import {
   Users,
   UserSearch,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useTenantJobs } from '@/hooks/useTenantJobs';
 import { StatCard } from '@/components/ui/StatCard';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
@@ -44,7 +46,9 @@ const BLUE_SHADES = ['#146c94', '#1f84b0', '#3aa0c9', '#62b9db', '#9ad4eb', '#cd
 const PIE_COLORS = ['#146c94', '#d32f2b'];
 
 export function Dashboard() {
-  const { candidates, loading, error } = useCandidates();
+  const { tenantId } = useAuth();
+  const { candidates, loading, error } = useCandidates(tenantId ?? undefined);
+  const jobs = useTenantJobs(tenantId);
 
   if (loading) return <Spinner label="Carregando dados do painel…" />;
   if (error) {
@@ -58,7 +62,7 @@ export function Dashboard() {
   const status = countByStatus(candidates);
   const last7Days = countLastNDays(candidates, 7);
   const thisMonth = countThisMonth(candidates);
-  const byArea = candidatesByArea(candidates);
+  const byArea = candidatesByArea(candidates, jobs);
   const byNeighborhood = candidatesByNeighborhood(candidates);
   const byExperience = candidatesByExperience(candidates);
   const byAvailability = candidatesByAvailability(candidates);
@@ -70,7 +74,7 @@ export function Dashboard() {
           <h1 className="text-2xl font-bold text-neutral-800">Dashboard</h1>
           <p className="text-sm text-neutral-500">Visão geral das candidaturas recebidas.</p>
         </div>
-        <Link to="/admin/relatorios">
+        <Link to="/app/relatorios">
           <Button variant="outline">
             <LineChart className="h-4 w-4" /> Ver relatórios completos
           </Button>

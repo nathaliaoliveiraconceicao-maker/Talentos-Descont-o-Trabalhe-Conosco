@@ -15,6 +15,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useTenantJobs } from '@/hooks/useTenantJobs';
+import { logAuditEvent } from '@/lib/auditLog';
 import {
   deleteCandidateData,
   getCandidate,
@@ -22,9 +24,10 @@ import {
   updateCandidateEvaluation,
   updateCandidateStatus,
 } from '@/lib/candidatesApi';
+import { getTenant, getTenantSettings, jobAreaLabel } from '@/lib/tenantApi';
 import type { Candidate, StatusHistoryEntry } from '@/types/candidate';
 import { STATUS_LABELS } from '@/types/candidate';
-import { jobAreaLabel } from '@/data/jobAreas';
+import type { TenantSettings } from '@/types/tenant';
 import { EDUCATION_LEVELS } from '@/data/educationLevels';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -42,26 +45,48 @@ interface InterviewInfo {
   location?: string;
 }
 
-function whatsappLink(phone: string, name: string, interview?: InterviewInfo): string {
+function fillTemplate(template: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce(
+    (text, [key, value]) => text.replaceAll(`{{${key}}}`, value),
+    template
+  );
+}
+
+function whatsappLink(
+  phone: string,
+  name: string,
+  tenantName: string,
+  templates: TenantSettings | null,
+  interview?: InterviewInfo
+): string {
   const digits = phone.replace(/\D/g, '');
   const fullNumber = digits.length <= 11 ? `55${digits}` : digits;
+
   const message =
-    interview?.date && interview?.time
-      ? `Olá, ${name}. Somos do setor de RH do Supermercado Descontão. Analisamos sua pré-candidatura e gostaríamos de convidar você para uma entrevista no dia ${new Date(
-          `${interview.date}T00:00:00`
-        ).toLocaleDateString('pt-BR')}, às ${interview.time}${
-          interview.location ? `, em ${interview.location}` : ''
-        }. Por favor, confirme o recebimento desta mensagem.`
-      : `Olá, ${name}. Somos da equipe do Supermercado Descontão. Analisamos sua pré-candidatura e gostaríamos de conversar sobre a próxima etapa do nosso processo seletivo.`;
+    interview?.date && interview?.time && templates
+      ? fillTemplate(templates.whatsappInterviewMessage, {
+          nome: name,
+          empresa: tenantName,
+          data: new Date(`${interview.date}T00:00:00`).toLocaleDateString('pt-BR'),
+          horario: interview.time,
+          local: interview.location || 'a combinar',
+        })
+      : templates
+        ? fillTemplate(templates.whatsappGenericMessage, { nome: name, empresa: tenantName })
+        : `Olá, ${name}. Somos da equipe de RH da ${tenantName}. Analisamos sua pré-candidatura e gostaríamos de conversar sobre a próxima etapa do nosso processo seletivo.`;
+
   return `https://wa.me/${fullNumber}?text=${encodeURIComponent(message)}`;
 }
 
 export function CandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { admin, user } = useAuth();
+  const { admin, user, tenantId } = useAuth();
+  const jobs = useTenantJobs(tenantId);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
+  const [tenantName, setTenantName] = useState('');
+  const [tenantSettings, setTenantSettings] = useState<TenantSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -82,17 +107,24 @@ export function CandidateDetail() {
   const actorName = admin?.name ?? user?.email ?? 'administrador';
 
   const load = async () => {
-    if (!id) return;
+    if (!id || !tenantId) return;
     setLoading(true);
     setError(null);
     try {
-      const [c, h] = await Promise.all([getCandidate(id), getStatusHistory(id)]);
+      const [c, h, tenant, settings] = await Promise.all([
+        getCandidate(tenantId, id),
+        getStatusHistory(tenantId, id),
+        getTenant(tenantId),
+        getTenantSettings(tenantId),
+      ]);
       if (!c) {
         setError('Candidato não encontrado.');
         return;
       }
       setCandidate(c);
       setHistory(h);
+      setTenantName(tenant?.name ?? '');
+      setTenantSettings(settings);
       setRecruiterNote(c.evaluation?.recruiterNote ?? '');
       setRecruiterRating(c.evaluation?.recruiterRating ?? 0);
       setResponsibleName(c.evaluation?.responsibleName ?? '');
@@ -110,16 +142,16 @@ export function CandidateDetail() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, tenantId]);
 
   if (loading) return <Spinner label="Carregando ficha do candidato…" />;
-  if (error || !candidate) {
+  if (error || !candidate || !tenantId) {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="h-4 w-4" /> {error}
         </div>
-        <Link to="/admin/candidatos" className="text-sm font-medium text-brand-blue-700 hover:underline">
+        <Link to="/app/candidatos" className="text-sm font-medium text-brand-blue-700 hover:underline">
           Voltar para a lista
         </Link>
       </div>
@@ -129,10 +161,19 @@ export function CandidateDetail() {
   const changeStatus = async (status: Candidate['status'], note?: string) => {
     setSavingStatus(true);
     try {
-      await updateCandidateStatus(candidate.id, status, actorName, {
+      await updateCandidateStatus(tenantId, candidate.id, status, actorName, {
         note,
         changedByUid: user?.uid,
         previousStatus: candidate.status,
+      });
+      await logAuditEvent({
+        tenantId,
+        actorUid: user?.uid ?? '',
+        actorName,
+        action: 'status_changed',
+        targetType: 'candidate',
+        targetId: candidate.id,
+        details: { from: candidate.status, to: status, note: note ?? '' },
       });
       await load();
     } finally {
@@ -142,6 +183,7 @@ export function CandidateDetail() {
 
   const toggleFavorite = async () => {
     await updateCandidateEvaluation(
+      tenantId,
       candidate.id,
       { ...candidate.evaluation, isFavorite: !candidate.evaluation?.isFavorite },
       actorName
@@ -153,6 +195,7 @@ export function CandidateDetail() {
     setSavingEvaluation(true);
     try {
       await updateCandidateEvaluation(
+        tenantId,
         candidate.id,
         {
           recruiterNote,
@@ -166,6 +209,14 @@ export function CandidateDetail() {
         },
         actorName
       );
+      await logAuditEvent({
+        tenantId,
+        actorUid: user?.uid ?? '',
+        actorName,
+        action: 'evaluation_updated',
+        targetType: 'candidate',
+        targetId: candidate.id,
+      });
       await load();
     } finally {
       setSavingEvaluation(false);
@@ -174,6 +225,7 @@ export function CandidateDetail() {
 
   const scheduleInterview = async () => {
     await updateCandidateEvaluation(
+      tenantId,
       candidate.id,
       {
         ...candidate.evaluation,
@@ -196,8 +248,17 @@ export function CandidateDetail() {
   const handleDeleteCandidate = async () => {
     setDeleting(true);
     try {
-      await deleteCandidateData(candidate.id);
-      navigate('/admin/candidatos', { replace: true });
+      await logAuditEvent({
+        tenantId,
+        actorUid: user?.uid ?? '',
+        actorName,
+        action: 'candidate_deleted',
+        targetType: 'candidate',
+        targetId: candidate.id,
+        details: { name: candidate.personal.fullName, protocol: candidate.protocol },
+      });
+      await deleteCandidateData(tenantId, candidate.id);
+      navigate('/app/candidatos', { replace: true });
     } finally {
       setDeleting(false);
       setDeleteModalOpen(false);
@@ -208,14 +269,14 @@ export function CandidateDetail() {
     <div className="flex flex-col gap-6 print:gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <button
-          onClick={() => navigate('/admin/candidatos')}
+          onClick={() => navigate('/app/candidatos')}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-brand-blue-700"
         >
           <ArrowLeft className="h-4 w-4" /> Voltar
         </button>
         <div className="flex flex-wrap gap-2">
           <a
-            href={whatsappLink(candidate.contact.whatsapp, candidate.personal.fullName, {
+            href={whatsappLink(candidate.contact.whatsapp, candidate.personal.fullName, tenantName, tenantSettings, {
               date: candidate.evaluation?.interviewDate,
               time: candidate.evaluation?.interviewTime,
               location: candidate.evaluation?.interviewLocation,
@@ -307,9 +368,9 @@ export function CandidateDetail() {
       <DetailSection title="Área de interesse">
         <InfoFieldFull
           label="Áreas selecionadas"
-          value={candidate.interest.areas.map(jobAreaLabel).join(', ')}
+          value={candidate.interest.areas.map((a) => jobAreaLabel(jobs, a)).join(', ')}
         />
-        <InfoField label="Área de maior interesse" value={jobAreaLabel(candidate.interest.mainAreaOfInterest)} />
+        <InfoField label="Área de maior interesse" value={jobAreaLabel(jobs, candidate.interest.mainAreaOfInterest)} />
         <InfoField label="Aceita outra função" value={candidate.interest.acceptsOtherRole} />
         <InfoField label="Buscando primeiro emprego" value={candidate.interest.isFirstJob} />
       </DetailSection>
@@ -413,7 +474,7 @@ export function CandidateDetail() {
       </DetailSection>
 
       <DetailSection title="Perfil profissional">
-        <InfoFieldFull label="Por que trabalhar no Descontão" value={candidate.profile.whyWorkHere} />
+        <InfoFieldFull label="Por que trabalhar aqui" value={candidate.profile.whyWorkHere} />
         <InfoFieldFull label="Principais qualidades" value={candidate.profile.mainQualities} />
         <InfoFieldFull label="Reação a orientações/correções" value={candidate.profile.reactionToFeedback} />
         <InfoFieldFull label="Situação em que ajudou um colega" value={candidate.profile.helpingColleagueStory} />
