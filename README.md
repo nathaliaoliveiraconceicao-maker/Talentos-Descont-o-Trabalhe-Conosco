@@ -279,7 +279,7 @@ pré-candidaturas recebidas.
   primeiro emprego e disponibilidade, e exportação em **CSV**: a exportação padrão não
   inclui observações internas nem avaliações do RH; a exportação completa inclui esses
   dados restritos (use com cuidado).
-- **`/admin/banco-talentos`** — lista apenas candidatos com status "Banco de talentos",
+- **`/admin/banco-de-talentos`** — lista apenas candidatos com status "Banco de talentos",
   com busca, tempo armazenado (baseado na última alteração de status) e destaque para
   quem está próximo do prazo de exclusão (calculado a partir do prazo configurado em
   `/admin/configuracoes`), com opção de reativar para um novo processo (volta o status
@@ -337,7 +337,7 @@ sobre a lista completa de candidatos.
 **Área administrativa (RH)**
 - [ ] `/admin` redireciona para `/admin/login` (sem sessão) ou `/admin/dashboard` (com sessão).
 - [ ] Rotas protegidas (`/admin/dashboard`, `/admin/candidatos`, `/admin/relatorios`,
-      `/admin/banco-talentos`, `/admin/configuracoes`) redirecionam para `/admin/login`
+      `/admin/banco-de-talentos`, `/admin/configuracoes`) redirecionam para `/admin/login`
       quando não autenticado.
 - [ ] Login com credenciais inválidas exibe mensagem de erro clara.
 - [ ] Conta autenticada sem documento em `admins` ativo (ou com `role` diferente de

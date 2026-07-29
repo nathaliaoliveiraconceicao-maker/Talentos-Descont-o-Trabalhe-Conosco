@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/candidatos', label: 'Candidatos', icon: Users },
   { to: '/admin/relatorios', label: 'Relatórios', icon: LineChart },
-  { to: '/admin/banco-talentos', label: 'Banco de Talentos', icon: Archive },
+  { to: '/admin/banco-de-talentos', label: 'Banco de Talentos', icon: Archive },
   { to: '/admin/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
