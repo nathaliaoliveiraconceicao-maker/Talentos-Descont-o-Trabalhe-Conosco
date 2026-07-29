@@ -15,9 +15,9 @@ export function Step9Consent({ errors }: { errors: Errors }) {
 
   return (
     <StepShell title="Consentimento" description="Última etapa antes de enviar sua pré-candidatura.">
-      <div className="flex items-start gap-3 rounded-xl2 border border-brand-green-200 bg-brand-green-50 p-4">
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-green-700" aria-hidden="true" />
-        <p className="text-sm text-brand-green-900">
+      <div className="flex items-start gap-3 rounded-xl2 border border-brand-blue-200 bg-brand-blue-50 p-4">
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-blue-700" aria-hidden="true" />
+        <p className="text-sm text-brand-blue-900">
           Seus dados não serão vendidos nem utilizados para fins de publicidade. As informações são
           usadas exclusivamente pela equipe de recrutamento do Supermercado Descontão. Saiba mais na{' '}
           <Link to="/politica-de-privacidade" target="_blank" className="font-semibold underline">

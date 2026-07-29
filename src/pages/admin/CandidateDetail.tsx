@@ -10,11 +10,13 @@ import {
   MessageCircle,
   Printer,
   Star,
+  Trash2,
   UserX,
   Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
+  deleteCandidateData,
   getCandidate,
   getStatusHistory,
   updateCandidateEvaluation,
@@ -34,10 +36,23 @@ import { FormField } from '@/components/ui/FormField';
 import { StatusBadge } from '@/components/ui/Badge';
 import { DetailSection, InfoField, InfoFieldFull } from '@/components/admin/DetailSection';
 
-function whatsappLink(phone: string, name: string): string {
+interface InterviewInfo {
+  date?: string;
+  time?: string;
+  location?: string;
+}
+
+function whatsappLink(phone: string, name: string, interview?: InterviewInfo): string {
   const digits = phone.replace(/\D/g, '');
   const fullNumber = digits.length <= 11 ? `55${digits}` : digits;
-  const message = `Olá, ${name}. Somos da equipe do Supermercado Descontão. Analisamos sua pré-candidatura e gostaríamos de conversar sobre a próxima etapa do nosso processo seletivo.`;
+  const message =
+    interview?.date && interview?.time
+      ? `Olá, ${name}. Somos do setor de RH do Supermercado Descontão. Analisamos sua pré-candidatura e gostaríamos de convidar você para uma entrevista no dia ${new Date(
+          `${interview.date}T00:00:00`
+        ).toLocaleDateString('pt-BR')}, às ${interview.time}${
+          interview.location ? `, em ${interview.location}` : ''
+        }. Por favor, confirme o recebimento desta mensagem.`
+      : `Olá, ${name}. Somos da equipe do Supermercado Descontão. Analisamos sua pré-candidatura e gostaríamos de conversar sobre a próxima etapa do nosso processo seletivo.`;
   return `https://wa.me/${fullNumber}?text=${encodeURIComponent(message)}`;
 }
 
@@ -53,11 +68,16 @@ export function CandidateDetail() {
   const [interviewModalOpen, setInterviewModalOpen] = useState(false);
   const [interviewDate, setInterviewDate] = useState('');
   const [interviewTime, setInterviewTime] = useState('');
+  const [interviewLocation, setInterviewLocation] = useState('');
+  const [interviewNotes, setInterviewNotes] = useState('');
 
   const [recruiterNote, setRecruiterNote] = useState('');
   const [recruiterRating, setRecruiterRating] = useState(0);
   const [responsibleName, setResponsibleName] = useState('');
   const [savingEvaluation, setSavingEvaluation] = useState(false);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const actorName = admin?.name ?? user?.email ?? 'administrador';
 
@@ -78,6 +98,8 @@ export function CandidateDetail() {
       setResponsibleName(c.evaluation?.responsibleName ?? '');
       setInterviewDate(c.evaluation?.interviewDate ?? '');
       setInterviewTime(c.evaluation?.interviewTime ?? '');
+      setInterviewLocation(c.evaluation?.interviewLocation ?? '');
+      setInterviewNotes(c.evaluation?.interviewNotes ?? '');
     } catch {
       setError('Não foi possível carregar os dados deste candidato.');
     } finally {
@@ -97,7 +119,7 @@ export function CandidateDetail() {
         <div className="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="h-4 w-4" /> {error}
         </div>
-        <Link to="/admin/candidatos" className="text-sm font-medium text-brand-green-700 hover:underline">
+        <Link to="/admin/candidatos" className="text-sm font-medium text-brand-blue-700 hover:underline">
           Voltar para a lista
         </Link>
       </div>
@@ -107,7 +129,11 @@ export function CandidateDetail() {
   const changeStatus = async (status: Candidate['status'], note?: string) => {
     setSavingStatus(true);
     try {
-      await updateCandidateStatus(candidate.id, status, actorName, note);
+      await updateCandidateStatus(candidate.id, status, actorName, {
+        note,
+        changedByUid: user?.uid,
+        previousStatus: candidate.status,
+      });
       await load();
     } finally {
       setSavingStatus(false);
@@ -134,6 +160,8 @@ export function CandidateDetail() {
           responsibleName,
           interviewDate,
           interviewTime,
+          interviewLocation,
+          interviewNotes,
           isFavorite: candidate.evaluation?.isFavorite ?? false,
         },
         actorName
@@ -151,13 +179,29 @@ export function CandidateDetail() {
         ...candidate.evaluation,
         interviewDate,
         interviewTime,
+        interviewLocation,
+        interviewNotes,
         responsibleName: responsibleName || actorName,
         isFavorite: candidate.evaluation?.isFavorite ?? false,
       },
       actorName
     );
-    await changeStatus('entrevista_agendada', `Entrevista agendada para ${interviewDate} ${interviewTime}`);
+    await changeStatus(
+      'entrevista_agendada',
+      `Entrevista agendada para ${interviewDate} às ${interviewTime}${interviewLocation ? ` em ${interviewLocation}` : ''}.`
+    );
     setInterviewModalOpen(false);
+  };
+
+  const handleDeleteCandidate = async () => {
+    setDeleting(true);
+    try {
+      await deleteCandidateData(candidate.id);
+      navigate('/admin/candidatos', { replace: true });
+    } finally {
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
   };
 
   return (
@@ -165,13 +209,17 @@ export function CandidateDetail() {
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <button
           onClick={() => navigate('/admin/candidatos')}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-brand-green-700"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-brand-blue-700"
         >
           <ArrowLeft className="h-4 w-4" /> Voltar
         </button>
         <div className="flex flex-wrap gap-2">
           <a
-            href={whatsappLink(candidate.contact.whatsapp, candidate.personal.fullName)}
+            href={whatsappLink(candidate.contact.whatsapp, candidate.personal.fullName, {
+              date: candidate.evaluation?.interviewDate,
+              time: candidate.evaluation?.interviewTime,
+              location: candidate.evaluation?.interviewLocation,
+            })}
             target="_blank"
             rel="noreferrer"
           >
@@ -203,6 +251,9 @@ export function CandidateDetail() {
           )}
           <Button variant="ghost" onClick={() => window.print()}>
             <Printer className="h-4 w-4" /> Imprimir ficha
+          </Button>
+          <Button variant="danger" onClick={() => setDeleteModalOpen(true)}>
+            <Trash2 className="h-4 w-4" /> Excluir dados (LGPD)
           </Button>
         </div>
       </div>
@@ -395,7 +446,7 @@ export function CandidateDetail() {
               rows={4}
             />
           </FormField>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <FormField label="Responsável pela análise" htmlFor="responsibleName">
               <Input id="responsibleName" value={responsibleName} onChange={(e) => setResponsibleName(e.target.value)} />
             </FormField>
@@ -405,7 +456,23 @@ export function CandidateDetail() {
             <FormField label="Horário da entrevista" htmlFor="interviewTime">
               <Input id="interviewTime" type="time" value={interviewTime} onChange={(e) => setInterviewTime(e.target.value)} />
             </FormField>
+            <FormField label="Local da entrevista" htmlFor="interviewLocation">
+              <Input
+                id="interviewLocation"
+                value={interviewLocation}
+                onChange={(e) => setInterviewLocation(e.target.value)}
+                placeholder="Ex.: Loja Centro, sala de RH"
+              />
+            </FormField>
           </div>
+          <FormField label="Observações da entrevista" htmlFor="interviewNotes">
+            <Textarea
+              id="interviewNotes"
+              value={interviewNotes}
+              onChange={(e) => setInterviewNotes(e.target.value)}
+              rows={3}
+            />
+          </FormField>
           <Button onClick={saveEvaluation} loading={savingEvaluation} className="self-start">
             Salvar avaliação
           </Button>
@@ -420,10 +487,11 @@ export function CandidateDetail() {
           <ol className="flex flex-col gap-4 border-l-2 border-neutral-200 pl-4">
             {history.map((entry) => (
               <li key={entry.id} className="relative">
-                <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-brand-green-500" />
+                <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-brand-blue-500" />
                 <p className="text-sm font-semibold text-neutral-800">{STATUS_LABELS[entry.status]}</p>
                 <p className="text-xs text-neutral-400">
                   {new Date(entry.changedAt).toLocaleString('pt-BR')} · {entry.changedBy}
+                  {entry.previousStatus && ` · anterior: ${STATUS_LABELS[entry.previousStatus]}`}
                 </p>
                 {entry.note && <p className="mt-0.5 text-sm text-neutral-600">{entry.note}</p>}
               </li>
@@ -464,6 +532,14 @@ export function CandidateDetail() {
               onChange={(e) => setInterviewTime(e.target.value)}
             />
           </FormField>
+          <FormField label="Local" htmlFor="modalInterviewLocation">
+            <Input
+              id="modalInterviewLocation"
+              value={interviewLocation}
+              onChange={(e) => setInterviewLocation(e.target.value)}
+              placeholder="Ex.: Loja Centro, sala de RH"
+            />
+          </FormField>
           <FormField label="Responsável pela análise" htmlFor="modalResponsible">
             <Input
               id="modalResponsible"
@@ -472,7 +548,37 @@ export function CandidateDetail() {
               placeholder={actorName}
             />
           </FormField>
+          <FormField label="Observações" htmlFor="modalInterviewNotes">
+            <Textarea
+              id="modalInterviewNotes"
+              value={interviewNotes}
+              onChange={(e) => setInterviewNotes(e.target.value)}
+              rows={3}
+            />
+          </FormField>
         </div>
+      </Modal>
+
+      <Modal
+        open={deleteModalOpen}
+        onClose={() => !deleting && setDeleteModalOpen(false)}
+        title="Excluir dados do candidato"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={handleDeleteCandidate} loading={deleting}>
+              Excluir permanentemente
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-neutral-600">
+          Esta ação é <strong>irreversível</strong> e removerá permanentemente todos os dados e o
+          currículo de <strong>{candidate.personal.fullName}</strong>, conforme solicitação do
+          titular, em conformidade com a LGPD.
+        </p>
       </Modal>
     </div>
   );

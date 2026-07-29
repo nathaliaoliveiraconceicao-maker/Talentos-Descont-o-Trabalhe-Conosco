@@ -1,7 +1,10 @@
+export type AdminRole = 'admin' | 'rh';
+
 export interface AdminUser {
   uid: string;
   email: string;
   name: string;
+  role: AdminRole;
   createdAt: string;
   active: boolean;
 }

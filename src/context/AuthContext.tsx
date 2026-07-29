@@ -7,10 +7,16 @@ import type { AdminUser } from '@/types/admin';
 interface AuthContextValue {
   user: User | null;
   admin: AdminUser | null;
+  /** true quando o usuário está autenticado, ativo e com papel admin ou rh. */
+  isAuthorized: boolean;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+}
+
+function isAuthorizedAdmin(admin: AdminUser | null): boolean {
+  return !!admin && admin.active === true && (admin.role === 'admin' || admin.role === 'rh');
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -54,7 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, admin, loading, error, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, admin, isAuthorized: isAuthorizedAdmin(admin), loading, error, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

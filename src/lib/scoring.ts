@@ -30,13 +30,17 @@ export function calculateScore(
 
   const mainArea = data.interest.mainAreaOfInterest;
   const areaExperienceMap: Record<string, boolean> = {
-    caixa: data.experience.hasCashierExperience === 'sim',
+    operador_caixa: data.experience.hasCashierExperience === 'sim',
+    fiscal_caixa: data.experience.hasCashierExperience === 'sim',
     repositor: data.experience.hasRestockingExperience === 'sim',
-    acougue: data.experience.hasButcherExperience === 'sim',
-    padaria: data.experience.hasBakeryExperience === 'sim',
-    estoque: data.experience.hasStockExperience === 'sim',
-    atendimento: data.experience.hasCustomerServiceExperience === 'sim',
-    lideranca: data.experience.hasLeadershipExperience === 'sim',
+    repositor_hortifruti: data.experience.hasRestockingExperience === 'sim',
+    acougueiro: data.experience.hasButcherExperience === 'sim',
+    ajudante_acougue: data.experience.hasButcherExperience === 'sim',
+    padeiro: data.experience.hasBakeryExperience === 'sim',
+    ajudante_padaria: data.experience.hasBakeryExperience === 'sim',
+    estoquista: data.experience.hasStockExperience === 'sim',
+    conferente: data.experience.hasStockExperience === 'sim',
+    atendente_frios: data.experience.hasCustomerServiceExperience === 'sim',
   };
   breakdown.areaExperience = mainArea && areaExperienceMap[mainArea] ? weights.areaExperience : 0;
 

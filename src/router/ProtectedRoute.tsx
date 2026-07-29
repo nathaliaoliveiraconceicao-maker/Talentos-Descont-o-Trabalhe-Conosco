@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Spinner } from '@/components/ui/Spinner';
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { isAuthorized, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -15,8 +15,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/admin" replace state={{ from: location.pathname }} />;
+  if (!isAuthorized) {
+    return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
   }
 
   return <>{children}</>;

@@ -1,18 +1,18 @@
 export type ContactPreference = 'whatsapp' | 'ligacao' | 'email';
 
 export type JobAreaId =
-  | 'caixa'
+  | 'ajudante_acougue'
+  | 'acougueiro'
+  | 'padeiro'
+  | 'ajudante_padaria'
+  | 'repositor_hortifruti'
   | 'repositor'
-  | 'acougue'
-  | 'padaria'
-  | 'hortifruti'
-  | 'estoque'
-  | 'limpeza'
-  | 'atendimento'
+  | 'operador_caixa'
+  | 'fiscal_caixa'
   | 'administrativo'
-  | 'entregas'
-  | 'prevencao_perdas'
-  | 'lideranca'
+  | 'atendente_frios'
+  | 'conferente'
+  | 'estoquista'
   | 'outra';
 
 export type CandidateStatus =
@@ -161,8 +161,10 @@ export interface ConsentData {
 export interface StatusHistoryEntry {
   id: string;
   status: CandidateStatus;
+  previousStatus?: CandidateStatus | null;
   changedAt: string;
   changedBy: string;
+  changedByUid?: string;
   note?: string;
 }
 
@@ -171,6 +173,8 @@ export interface CandidateEvaluation {
   recruiterRating?: number; // 1-5
   interviewDate?: string;
   interviewTime?: string;
+  interviewLocation?: string;
+  interviewNotes?: string;
   responsibleName?: string;
   isFavorite: boolean;
 }

@@ -23,8 +23,9 @@ const NEIGHBORHOODS = [
 ];
 const CITY = 'Descontópolis';
 const AREAS = [
-  'caixa', 'repositor', 'acougue', 'padaria', 'hortifruti', 'estoque',
-  'limpeza', 'atendimento', 'administrativo', 'entregas', 'prevencao_perdas', 'lideranca',
+  'ajudante_acougue', 'acougueiro', 'padeiro', 'ajudante_padaria',
+  'repositor_hortifruti', 'repositor', 'operador_caixa', 'fiscal_caixa',
+  'administrativo', 'atendente_frios', 'conferente', 'estoquista',
 ];
 const STATUSES = [
   'nova_candidatura', 'em_analise', 'pre_selecionado', 'entrevista_agendada',

@@ -3,14 +3,14 @@
  * Troque o arquivo em public/logo-placeholder.svg pela logo oficial,
  * ou aponte "src" para um novo arquivo dentro de /public.
  */
-export function Logo({ className = 'h-10' }: { className?: string }) {
+export function Logo({ className = 'h-12' }: { className?: string }) {
   return (
     <img
       src="/logo-placeholder.svg"
       alt="Supermercado Descontão"
-      className={className}
-      width={220}
-      height={56}
+      className={`w-auto ${className}`}
+      width={480}
+      height={190}
     />
   );
 }

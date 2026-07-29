@@ -4,17 +4,19 @@ interface StatCardProps {
   label: string;
   value: number | string;
   icon: LucideIcon;
-  accent?: 'green' | 'yellow' | 'neutral';
+  accent?: 'blue' | 'red' | 'green' | 'yellow' | 'neutral';
   hint?: string;
 }
 
 const accentClasses = {
+  blue: 'bg-brand-blue-100 text-brand-blue-700',
+  red: 'bg-brand-red-100 text-brand-red-700',
   green: 'bg-brand-green-100 text-brand-green-700',
   yellow: 'bg-brand-yellow-100 text-brand-yellow-800',
   neutral: 'bg-neutral-100 text-neutral-600',
 };
 
-export function StatCard({ label, value, icon: Icon, accent = 'green', hint }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, accent = 'blue', hint }: StatCardProps) {
   return (
     <div className="rounded-xl2 border border-neutral-200 bg-white p-4 shadow-card">
       <div className="flex items-center justify-between">

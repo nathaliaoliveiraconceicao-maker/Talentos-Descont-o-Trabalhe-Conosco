@@ -21,7 +21,7 @@ export function RadioGroup({ name, options, value, onChange, hasError }: RadioGr
             key={option.value}
             className={`cursor-pointer rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
               checked
-                ? 'border-brand-green-500 bg-brand-green-50 text-brand-green-800'
+                ? 'border-brand-blue-500 bg-brand-blue-50 text-brand-blue-800'
                 : `border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 ${hasError ? 'border-red-300' : ''}`
             }`}
           >

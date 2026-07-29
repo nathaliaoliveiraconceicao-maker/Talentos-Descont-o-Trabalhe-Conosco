@@ -6,18 +6,18 @@ export interface JobAreaOption {
 }
 
 export const JOB_AREAS: JobAreaOption[] = [
-  { id: 'caixa', label: 'Operador de caixa' },
+  { id: 'ajudante_acougue', label: 'Ajudante de Açougue' },
+  { id: 'acougueiro', label: 'Açougueiro' },
+  { id: 'padeiro', label: 'Padeiro' },
+  { id: 'ajudante_padaria', label: 'Ajudante de Padaria' },
+  { id: 'repositor_hortifruti', label: 'Repositor de Hortifrúti' },
   { id: 'repositor', label: 'Repositor' },
-  { id: 'acougue', label: 'Açougue' },
-  { id: 'padaria', label: 'Padaria' },
-  { id: 'hortifruti', label: 'Hortifrúti' },
-  { id: 'estoque', label: 'Estoque' },
-  { id: 'limpeza', label: 'Limpeza' },
-  { id: 'atendimento', label: 'Atendimento' },
+  { id: 'operador_caixa', label: 'Operador(a) de Caixa' },
+  { id: 'fiscal_caixa', label: 'Fiscal de Caixa' },
   { id: 'administrativo', label: 'Administrativo' },
-  { id: 'entregas', label: 'Entregas' },
-  { id: 'prevencao_perdas', label: 'Prevenção de perdas' },
-  { id: 'lideranca', label: 'Liderança' },
+  { id: 'atendente_frios', label: 'Atendente de Frios' },
+  { id: 'conferente', label: 'Conferente' },
+  { id: 'estoquista', label: 'Estoquista' },
   { id: 'outra', label: 'Outra área' },
 ];
 

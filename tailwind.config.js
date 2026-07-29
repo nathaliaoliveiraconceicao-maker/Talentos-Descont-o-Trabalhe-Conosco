@@ -5,6 +5,32 @@ export default {
     extend: {
       colors: {
         brand: {
+          blue: {
+            50: '#eaf6fb',
+            100: '#cdeaf5',
+            200: '#9ad4eb',
+            300: '#62b9db',
+            400: '#3aa0c9',
+            500: '#1f84b0',
+            600: '#146c94',
+            700: '#125877',
+            800: '#124862',
+            900: '#0f3a4f',
+            950: '#082433',
+          },
+          red: {
+            50: '#fdeeee',
+            100: '#fbd4d3',
+            200: '#f5a5a3',
+            300: '#ec7370',
+            400: '#e14b47',
+            500: '#d32f2b',
+            600: '#b8221f',
+            700: '#951c1a',
+            800: '#791a19',
+            900: '#631918',
+            950: '#360a09',
+          },
           green: {
             50: '#eefbf1',
             100: '#d6f5dd',
@@ -37,8 +63,8 @@ export default {
         sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
       },
       boxShadow: {
-        card: '0 2px 10px 0 rgb(15 67 39 / 0.06), 0 1px 2px 0 rgb(15 67 39 / 0.04)',
-        'card-hover': '0 8px 24px 0 rgb(15 67 39 / 0.10)',
+        card: '0 2px 10px 0 rgb(15 58 79 / 0.06), 0 1px 2px 0 rgb(15 58 79 / 0.04)',
+        'card-hover': '0 8px 24px 0 rgb(15 58 79 / 0.10)',
       },
       borderRadius: {
         xl2: '1.25rem',

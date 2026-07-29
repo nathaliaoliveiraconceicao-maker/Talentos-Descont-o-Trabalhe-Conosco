@@ -11,7 +11,7 @@ export function Header() {
         <nav className="flex items-center gap-3">
           <Link
             to="/candidatura"
-            className="hidden rounded-lg bg-brand-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-green-700 sm:inline-flex"
+            className="hidden rounded-lg bg-brand-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-blue-700 sm:inline-flex"
           >
             Quero me candidatar
           </Link>

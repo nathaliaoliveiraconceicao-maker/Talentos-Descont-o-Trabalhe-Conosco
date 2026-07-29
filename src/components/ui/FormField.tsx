@@ -13,7 +13,7 @@ export function FormField({ label, htmlFor, required, error, hint, children }: F
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-sm font-semibold text-neutral-700">
-        {label} {required && <span className="text-brand-green-600">*</span>}
+        {label} {required && <span className="text-brand-blue-600">*</span>}
         {!required && <span className="ml-1 text-xs font-normal text-neutral-400">(opcional)</span>}
       </label>
       {children}

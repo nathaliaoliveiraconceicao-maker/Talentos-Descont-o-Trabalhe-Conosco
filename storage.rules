@@ -2,10 +2,12 @@ rules_version = '2';
 
 // Regras de segurança do Firebase Storage — Talentos Descontão
 //
-// Somente administradores possuem contas no Firebase Authentication
+// Somente administradores/RH possuem contas no Firebase Authentication
 // (criadas via script/console — candidatos nunca se autenticam). Por isso,
 // "request.auth != null" neste projeto equivale, na prática, a "é um
-// administrador autenticado".
+// usuário administrativo autenticado" (o papel admin/rh e o campo active
+// são validados no Firestore, em /admins/{uid}, pelas regras do Firestore
+// e pela lógica de autorização da aplicação).
 service firebase.storage {
   match /b/{bucket}/o {
     match /resumes/{fileName} {

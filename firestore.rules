@@ -4,9 +4,10 @@ rules_version = '2';
 //
 // Modelo de acesso:
 // - Candidatos (público, não autenticado) só podem CRIAR uma pré-candidatura.
-//   Não podem ler, alterar ou excluir nenhum dado.
-// - Administradores autenticados (com documento em /admins/{uid} e active == true)
-//   podem ler, atualizar status/avaliação e excluir dados de candidatos.
+//   Não podem listar, ler, alterar ou excluir nenhum dado — nem o próprio.
+// - Administradores/RH autenticados (documento em /admins/{uid} com active == true
+//   e role em ['admin', 'rh']) podem ler, atualizar status/avaliação e excluir
+//   dados de candidatos, e acessar relatórios (mesma coleção "candidates").
 // - Nenhum documento de administrador pode ser criado/editado pelo cliente:
 //   isso deve ser feito exclusivamente via Firebase Admin SDK (script createAdmin)
 //   ou pelo Console do Firebase, evitando auto-promoção de usuários a admin.
@@ -20,7 +21,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'rh'];
     }
 
     // --- candidates ---------------------------------------------------

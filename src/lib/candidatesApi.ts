@@ -168,7 +168,7 @@ export async function updateCandidateStatus(
   candidateId: string,
   status: CandidateStatus,
   changedBy: string,
-  note?: string
+  options?: { note?: string; changedByUid?: string; previousStatus?: CandidateStatus | null }
 ): Promise<void> {
   const nowIso = new Date().toISOString();
   await updateDoc(doc(db, CANDIDATES_COLLECTION, candidateId), {
@@ -178,9 +178,11 @@ export async function updateCandidateStatus(
   await addDoc(collection(db, STATUS_HISTORY_COLLECTION), {
     candidateId,
     status,
+    previousStatus: options?.previousStatus ?? null,
     changedAt: nowIso,
     changedBy,
-    note: note ?? '',
+    changedByUid: options?.changedByUid ?? '',
+    note: options?.note ?? '',
   });
 }
 
@@ -189,6 +191,8 @@ export interface EvaluationUpdate {
   recruiterRating?: number;
   interviewDate?: string;
   interviewTime?: string;
+  interviewLocation?: string;
+  interviewNotes?: string;
   responsibleName?: string;
   isFavorite?: boolean;
 }

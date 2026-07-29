@@ -23,7 +23,7 @@ const STEPS = [
 export function Home() {
   return (
     <div>
-      <section className="relative overflow-hidden bg-gradient-to-b from-brand-green-700 via-brand-green-600 to-brand-green-500 text-white">
+      <section className="relative overflow-hidden bg-gradient-to-b from-brand-blue-700 via-brand-blue-600 to-brand-blue-500 text-white">
         <div className="container-page flex flex-col items-center gap-6 py-16 text-center sm:py-24">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide">
             Banco de Talentos Descontão
@@ -31,13 +31,13 @@ export function Home() {
           <h1 className="max-w-3xl text-3xl font-extrabold leading-tight sm:text-5xl">
             Seu próximo passo pode começar aqui.
           </h1>
-          <p className="max-w-xl text-base text-brand-green-50 sm:text-lg">
+          <p className="max-w-xl text-base text-brand-blue-50 sm:text-lg">
             Cadastre-se no banco de talentos do Supermercado Descontão e participe dos nossos
             futuros processos seletivos.
           </p>
           <Link
             to="/candidatura"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-yellow-400 px-8 py-3.5 text-base font-bold text-brand-green-950 shadow-lg transition-transform hover:scale-[1.03] hover:bg-brand-yellow-300"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-yellow-400 px-8 py-3.5 text-base font-bold text-brand-blue-950 shadow-lg transition-transform hover:scale-[1.03] hover:bg-brand-yellow-300"
           >
             Quero me candidatar
           </Link>
@@ -56,7 +56,7 @@ export function Home() {
           {STEPS.map((step) => (
             <Card key={step.title} className="text-center transition-shadow hover:shadow-card-hover">
               <CardBody className="flex flex-col items-center gap-3 py-8">
-                <span className="rounded-full bg-brand-green-100 p-3 text-brand-green-700">
+                <span className="rounded-full bg-brand-blue-100 p-3 text-brand-blue-700">
                   <step.icon className="h-6 w-6" aria-hidden="true" />
                 </span>
                 <h3 className="font-bold text-neutral-800">{step.title}</h3>
@@ -78,11 +78,11 @@ export function Home() {
 
       <section className="border-t border-neutral-200 bg-white py-12">
         <div className="container-page flex flex-col items-center gap-3 text-center">
-          <ShieldCheck className="h-6 w-6 text-brand-green-600" aria-hidden="true" />
+          <ShieldCheck className="h-6 w-6 text-brand-blue-600" aria-hidden="true" />
           <p className="max-w-xl text-sm text-neutral-500">
             Seus dados são usados exclusivamente para processos de recrutamento e seleção do
             Supermercado Descontão. Consulte nossa{' '}
-            <Link to="/politica-de-privacidade" className="font-medium text-brand-green-700 underline">
+            <Link to="/politica-de-privacidade" className="font-medium text-brand-blue-700 underline">
               Política de Privacidade
             </Link>
             .

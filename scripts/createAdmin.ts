@@ -17,11 +17,12 @@ async function main() {
 
   console.log('\n=== Criar administrador — Talentos Descontão ===\n');
 
-  const name = readlineSync.question('Nome completo do administrador: ').trim();
+  const name = readlineSync.question('Nome completo: ').trim();
   const email = readlineSync.questionEMail('E-mail de acesso: ');
   const password = readlineSync.question('Senha temporária (mínimo 6 caracteres): ', {
     hideEchoBack: true,
   });
+  const role = readlineSync.keyInSelect(['admin', 'rh'], 'Papel de acesso:') === 1 ? 'rh' : 'admin';
 
   if (password.length < 6) {
     console.error('❌ A senha deve ter ao menos 6 caracteres.');
@@ -48,14 +49,16 @@ async function main() {
       uid: userRecord.uid,
       email,
       name,
+      role,
       active: true,
       createdAt: new Date().toISOString(),
     });
 
-  console.log('\n✅ Administrador criado com sucesso!');
+  console.log('\n✅ Usuário administrativo criado com sucesso!');
   console.log(`   UID: ${userRecord.uid}`);
   console.log(`   E-mail: ${email}`);
-  console.log('   Ele já pode acessar /admin com o e-mail e a senha definidos.\n');
+  console.log(`   Papel: ${role}`);
+  console.log('   Ele já pode acessar /admin/login com o e-mail e a senha definidos.\n');
   process.exit(0);
 }
 

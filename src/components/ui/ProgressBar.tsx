@@ -23,7 +23,7 @@ export function ProgressBar({ currentStep, totalSteps, stepLabel }: ProgressBarP
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-brand-green-500 to-brand-yellow-400 transition-all duration-500"
+          className="h-full rounded-full bg-gradient-to-r from-brand-blue-600 to-brand-red-500 transition-all duration-500"
           style={{ width: `${percent}%` }}
         />
       </div>

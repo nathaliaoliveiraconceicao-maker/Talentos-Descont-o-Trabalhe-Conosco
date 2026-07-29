@@ -23,6 +23,8 @@ recrutamento analisa, filtra e seleciona os melhores perfis antes de convocá-lo
 - [8. Inserindo a logomarca oficial](#8-inserindo-a-logomarca-oficial)
 - [9. Segurança e LGPD](#9-segurança-e-lgpd)
 - [10. Sistema de pontuação](#10-sistema-de-pontuação)
+- [11. Área administrativa (RH)](#11-área-administrativa-rh)
+- [12. Coleções e campos do Firestore](#12-coleções-e-campos-do-firestore)
 - [Checklist final de testes](#checklist-final-de-testes)
 
 ## Tecnologias
@@ -56,7 +58,8 @@ recrutamento analisa, filtra e seleciona os melhores perfis antes de convocá-lo
 │   ├── lib/                        # firebase.ts, validators, masks, scoring, APIs
 │   ├── pages/
 │   │   ├── Application/            # formulário de 9 etapas + confirmação
-│   │   └── admin/                  # login, dashboard, lista, ficha, configurações
+│   │   └── admin/                  # login, dashboard, lista, ficha, relatórios,
+│   │                                 banco de talentos, configurações
 │   ├── router/                     # ProtectedRoute
 │   └── types/                      # tipos TypeScript (candidate, admin)
 ├── firestore.rules
@@ -124,13 +127,14 @@ A aplicação estará disponível em `http://localhost:5173`.
 
 - Portal público: `http://localhost:5173/`
 - Formulário de candidatura: `http://localhost:5173/candidatura`
-- Área administrativa: `http://localhost:5173/admin`
+- Área administrativa (RH): `http://localhost:5173/admin` (redireciona para
+  `/admin/login` ou `/admin/dashboard`, conforme o estado de autenticação)
 
-## 4. Criando o primeiro administrador
+## 4. Criando o primeiro usuário do RH (administrador)
 
-Os administradores **não se cadastram pela interface** — isso evita que qualquer
-pessoa se auto-promova a administrador. A criação é feita por um script Node com o
-**Firebase Admin SDK**, que tem privilégios elevados.
+Os usuários administrativos **não se cadastram pela interface** — isso evita que
+qualquer pessoa se auto-promova a administrador. A criação é feita por um script Node
+com o **Firebase Admin SDK**, que tem privilégios elevados.
 
 1. No Console do Firebase, vá em **Configurações do projeto > Contas de serviço** e
    clique em **Gerar nova chave privada**. Um arquivo `.json` será baixado.
@@ -143,17 +147,25 @@ pessoa se auto-promova a administrador. A criação é feita por um script Node 
    npm run create-admin
    ```
 
-4. Informe nome, e-mail e senha temporária. O script cria o usuário no Firebase
-   Authentication e o documento correspondente em `admins/{uid}` no Firestore
-   (com `active: true`).
-5. Acesse `/admin` com o e-mail e senha cadastrados.
+4. Informe nome, e-mail, senha temporária e escolha o **papel de acesso**
+   (`admin` ou `rh`). O script cria o usuário no Firebase Authentication e o
+   documento correspondente em `admins/{uid}` no Firestore, com `active: true`.
+5. Acesse `/admin/login` com o e-mail e senha cadastrados.
 
-## 5. Cadastrando outros administradores
+## 5. Cadastrando outros administradores/RH
 
 Basta rodar `npm run create-admin` novamente quantas vezes forem necessárias — cada
-execução cria um novo administrador independente. Para revogar o acesso de alguém sem
+execução cria um novo usuário administrativo independente, com o papel escolhido na
+hora (`admin` ou `rh` — ambos têm o mesmo nível de acesso ao painel hoje; o campo
+existe para permitir diferenciação futura). Para revogar o acesso de alguém sem
 excluir a conta, edite o campo `active` do documento em `admins/{uid}` no Firestore
-para `false` (as regras de segurança exigem `active == true` para acesso administrativo).
+para `false` (as regras de segurança exigem `active == true` **e** `role` em
+`['admin', 'rh']` para acesso administrativo).
+
+> Se você já tinha administradores criados antes desta versão (sem o campo `role`),
+> adicione manualmente `role: "admin"` ao documento correspondente em `admins/{uid}`
+> no Firestore, ou rode `npm run create-admin` novamente com o mesmo e-mail — o script
+> reaproveita a conta existente no Authentication e atualiza o documento no Firestore.
 
 ## 6. Populando dados fictícios para teste
 
@@ -186,22 +198,28 @@ firebase deploy --only hosting
 
 ## 8. Inserindo a logomarca oficial
 
-Substitua o arquivo `public/logo-placeholder.svg` pela logomarca oficial do
-Supermercado Descontão (mantendo o mesmo nome de arquivo), ou aponte o componente
+O arquivo `public/logo-placeholder.svg` traz uma recriação aproximada da identidade
+visual (cartão azul com carrinho, faixa vermelha "DESCONTÃO", texto preto
+"SUPERMERCADO") — a paleta de cores do projeto (`tailwind.config.js`, cores
+`brand.blue`, `brand.red`, `brand.yellow`) já foi ajustada para combinar com ela.
+Substitua esse arquivo pelo arquivo oficial em alta resolução assim que disponível
+(mantendo o nome `logo-placeholder.svg`), ou aponte o componente
 `src/components/layout/Logo.tsx` para um novo arquivo dentro de `public/`. Formatos
 recomendados: SVG (preferencial) ou PNG com fundo transparente.
 
 ## 9. Segurança e LGPD
 
 - **`firestore.rules`**: candidatos (não autenticados) só podem **criar** uma
-  pré-candidatura — nunca ler, alterar ou excluir dados. Somente administradores
-  autenticados (com documento em `admins/{uid}` e `active: true`) podem ler, atualizar
-  status/avaliações e excluir candidatos. O documento de administrador nunca pode ser
-  criado ou editado pelo cliente — apenas via Admin SDK.
+  pré-candidatura — nunca listar, ler, alterar ou excluir dados, nem os próprios.
+  Somente usuários administrativos autenticados (com documento em `admins/{uid}`,
+  `active: true` e `role` em `['admin', 'rh']`) podem ler, atualizar status/avaliações
+  e excluir candidatos — o que também cobre o acesso a relatórios, já que eles usam a
+  mesma coleção `candidates`. O documento de administrador nunca pode ser criado ou
+  editado pelo cliente — apenas via Admin SDK.
 - **`storage.rules`**: candidatos podem enviar (`create`) o currículo respeitando tipo e
   tamanho de arquivo; a leitura e exclusão dos arquivos ficam restritas a usuários
-  autenticados (ou seja, administradores — candidatos nunca possuem contas no Firebase
-  Authentication neste sistema).
+  autenticados (ou seja, administradores/RH — candidatos nunca possuem contas no
+  Firebase Authentication neste sistema).
 - **Política de Privacidade**: disponível em `/politica-de-privacidade`, com linguagem
   simplificada sobre finalidade do tratamento, retenção e direitos do titular.
 - **Exclusão de dados por solicitação**: em `/admin/configuracoes`, um administrador
@@ -231,6 +249,71 @@ A pontuação é exibida no painel apenas como **apoio à triagem** — a decis�
 cada candidato deve sempre ser tomada por um recrutador humano, conforme aviso fixo no
 dashboard.
 
+## 11. Área administrativa (RH)
+
+A área administrativa (`/admin/*`) é o painel usado pelo setor de RH para analisar as
+pré-candidaturas recebidas.
+
+- **`/admin/login`** — login por e-mail/senha. Após autenticar no Firebase, o sistema
+  verifica o documento em `admins/{uid}`: o acesso só é liberado se `active == true` e
+  `role` for `admin` ou `rh`. Uma conta autenticada mas sem permissão vê uma tela de
+  "Acesso não autorizado" com opção de sair e tentar outra conta.
+- **`/admin/dashboard`** — cards com total de candidatos, novas candidaturas, em
+  análise, pré-selecionados, entrevistas agendadas, aprovados, banco de talentos, não
+  selecionados, candidaturas dos últimos 7 dias e do mês atual, além de gráficos por
+  função, bairro, experiência e disponibilidade.
+- **`/admin/candidatos`** — tabela responsiva com busca unificada (nome, telefone,
+  e-mail, bairro) e filtros por status, área, bairro, disponibilidade, primeiro
+  emprego, experiência profissional, experiência em supermercado, fins de semana, data
+  e pontuação mínima; ordenação por mais recentes/antigos, maior/menor pontuação e
+  nome.
+- **`/admin/candidatos/:id`** — ficha completa do candidato, com todas as respostas do
+  formulário organizadas em seções, avaliação do RH (nota, observações, responsável,
+  entrevista com data/horário/local/observações), histórico de status (com status
+  anterior, novo status, data/hora, UID e nome de quem alterou), botão de WhatsApp com
+  mensagem pronta (convite de entrevista quando já agendada, ou mensagem genérica caso
+  contrário — nunca enviada automaticamente), download de currículo, impressão da
+  ficha, favoritar e **exclusão de dados mediante solicitação do candidato (LGPD)**.
+- **`/admin/relatorios`** — filtro por período (data de/até), taxas de pré-seleção,
+  entrevista e aprovação, gráficos por status, área, bairro, escolaridade, experiência,
+  primeiro emprego e disponibilidade, e exportação em **CSV**: a exportação padrão não
+  inclui observações internas nem avaliações do RH; a exportação completa inclui esses
+  dados restritos (use com cuidado).
+- **`/admin/banco-talentos`** — lista apenas candidatos com status "Banco de talentos",
+  com busca, tempo armazenado (baseado na última alteração de status) e destaque para
+  quem está próximo do prazo de exclusão (calculado a partir do prazo configurado em
+  `/admin/configuracoes`), com opção de reativar para um novo processo (volta o status
+  para "Em análise") ou excluir conforme a política de retenção.
+- **`/admin/configuracoes`** — pesos do sistema de pontuação, prazo de retenção do
+  banco de talentos, e uma ferramenta geral de busca + exclusão de dados por
+  solicitação (útil quando o RH não está com a ficha do candidato aberta).
+
+Todas as telas têm estado de carregamento, estado vazio (quando ainda não há
+candidatos) e mensagens de erro claras; ações críticas (excluir dados, alterar status)
+pedem confirmação antes de executar.
+
+## 12. Coleções e campos do Firestore
+
+O formulário público grava tudo em `candidates`; as demais coleções guardam histórico,
+avaliações e configurações. Nenhum campo existente foi renomeado nesta atualização —
+apenas foram adicionados campos novos (compatíveis com documentos antigos, que
+simplesmente não terão esses campos preenchidos até serem editados pelo RH).
+
+| Coleção | Descrição | Campos principais |
+| --- | --- | --- |
+| `candidates` | Uma pré-candidatura por documento. | `personal`, `contact` (+`whatsappDigits`), `interest`, `availability`, `experience`, `education`, `profile`, `resume`, `consent`, `protocol`, `status`, `score`, `scoreBreakdown`, `createdAt`, `updatedAt`, `evaluation` (`recruiterNote`, `recruiterRating`, `interviewDate`, `interviewTime`, `interviewLocation`, `interviewNotes`, `responsibleName`, `isFavorite`) |
+| `statusHistory` | Log imutável de mudanças de status. | `candidateId`, `status`, `previousStatus`, `changedAt`, `changedBy` (nome), `changedByUid`, `note` |
+| `evaluations` | Log imutável de avaliações do RH (auditoria; o estado atual também fica em `candidates.evaluation`). | `candidateId`, campos da avaliação, `updatedBy`, `updatedAt` |
+| `admins` | Usuários administrativos (RH/admin). | `uid`, `email`, `name`, `role` (`admin` \| `rh`), `active`, `createdAt` |
+| `scoringSettings` | Documento `current` (pesos de pontuação) e `retention` (prazo de retenção do banco de talentos). | `weights`, `talentPoolRetentionMonths`, `updatedAt`, `updatedBy` |
+| `jobAreas` | Reservada para expansão futura (hoje as áreas de vaga são uma lista estática em `src/data/jobAreas.ts`). | `id`, `label`, `active` |
+
+Nenhum índice composto do Firestore é necessário: todas as consultas usadas
+(`orderBy('createdAt')`, `where('contact.email', '==', …)`,
+`where('contact.whatsappDigits', '==', …)`, `where('candidateId', '==', …)`) são de
+campo único; filtros, buscas, ordenações e relatórios são todos calculados no cliente
+sobre a lista completa de candidatos.
+
 ## Checklist final de testes
 
 **Fluxo público**
@@ -251,31 +334,47 @@ dashboard.
 - [ ] Página de confirmação exibe o número de protocolo gerado.
 - [ ] Política de Privacidade está acessível pelo rodapé.
 
-**Área administrativa**
-- [ ] `/admin` exige login; usuários não autenticados são redirecionados.
+**Área administrativa (RH)**
+- [ ] `/admin` redireciona para `/admin/login` (sem sessão) ou `/admin/dashboard` (com sessão).
+- [ ] Rotas protegidas (`/admin/dashboard`, `/admin/candidatos`, `/admin/relatorios`,
+      `/admin/banco-talentos`, `/admin/configuracoes`) redirecionam para `/admin/login`
+      quando não autenticado.
 - [ ] Login com credenciais inválidas exibe mensagem de erro clara.
-- [ ] Dashboard exibe os cards de estatísticas e os 4 gráficos corretamente.
-- [ ] Lista de candidatos exibe todos os candidatos cadastrados.
-- [ ] Filtros (nome, data, bairro, área, disponibilidade, primeiro emprego,
-      experiência em supermercado, pontuação, status) funcionam individualmente e em
-      combinação.
-- [ ] Ordenação (recentes, pontuação, nome, experiência) funciona.
+- [ ] Conta autenticada sem documento em `admins` ativo (ou com `role` diferente de
+      `admin`/`rh`) vê a tela de "Acesso não autorizado", não o painel.
+- [ ] Estado de carregamento aparece durante a verificação de autenticação.
+- [ ] Dashboard exibe todos os cards (incluindo "Não selecionados" e "No mês atual") e
+      os 4 gráficos corretamente; mostra estado vazio sem candidatos.
+- [ ] Lista de candidatos: busca unificada (nome/telefone/e-mail/bairro) e todos os
+      filtros funcionam individualmente e em combinação; as 5 opções de ordenação
+      funcionam.
 - [ ] Ficha do candidato exibe todas as seções de dados corretamente.
-- [ ] Botão do WhatsApp abre o chat com mensagem pré-preenchida (sem enviar automaticamente).
-- [ ] Alteração de status atualiza o histórico de status.
-- [ ] Agendamento de entrevista salva data/horário e muda o status.
-- [ ] Avaliação do recrutador (nota, observações, responsável) é salva.
+- [ ] Botão do WhatsApp abre o chat com mensagem pré-preenchida (convite de entrevista
+      quando já agendada, mensagem genérica caso contrário) — nunca envia automaticamente.
+- [ ] Alteração de status atualiza o histórico (status anterior, novo status,
+      data/hora, UID e nome do responsável).
+- [ ] Agendamento de entrevista salva data/horário/local/observações e muda o status.
+- [ ] Avaliação do RH (nota, observações internas, responsável) é salva.
 - [ ] Marcar/desmarcar como favorito funciona.
-- [ ] Download do currículo funciona quando anexado.
-- [ ] Impressão da ficha (`Imprimir ficha`) oculta os botões de ação.
-- [ ] Configurações: pesos de pontuação são salvos e refletem em novos cálculos.
-- [ ] Configurações: prazo de retenção é salvo.
-- [ ] Configurações: busca e exclusão de dados (LGPD) funciona e é irreversível.
-- [ ] Logout funciona e redireciona para a tela de login.
+- [ ] Download do currículo funciona quando anexado; impressão da ficha oculta os
+      botões de ação.
+- [ ] Exclusão de dados (LGPD) funciona tanto pela ficha do candidato quanto pela busca
+      em Configurações, com confirmação antes de excluir.
+- [ ] Relatórios: filtro de período afeta todos os números/gráficos; taxas de
+      pré-seleção/entrevista/aprovação corretas; exportação CSV padrão baixa um
+      arquivo sem observações/avaliações; exportação completa inclui esses campos.
+- [ ] Banco de talentos: lista só candidatos com esse status; busca funciona; badge de
+      "próximo do prazo" aparece corretamente; reativar volta o status para "Em
+      análise"; excluir remove os dados.
+- [ ] Configurações: pesos de pontuação são salvos e refletem em novos cálculos;
+      prazo de retenção é salvo.
+- [ ] Logout funciona e redireciona para `/admin/login`.
 
 **Geral**
-- [ ] Layout responsivo em telas de celular, tablet e desktop.
+- [ ] Layout responsivo em telas de celular, tablet e desktop (testar especialmente a
+      lista de candidatos e os relatórios no celular).
 - [ ] Navegação por teclado (Tab/Enter/Esc) funciona nos formulários e modais.
-- [ ] Contraste de cores adequado (verde/amarelo sobre fundo branco/neutro).
-- [ ] `npm run build` conclui sem erros de TypeScript.
-- [ ] Regras do Firestore/Storage publicadas no projeto Firebase de produção.
+- [ ] Contraste de cores adequado (azul/vermelho/amarelo sobre fundo branco/neutro).
+- [ ] `npm run build` conclui sem erros de TypeScript ou imports quebrados.
+- [ ] Regras do Firestore/Storage publicadas no projeto Firebase de produção, com o
+      campo `role` presente em todos os documentos de `admins`.
