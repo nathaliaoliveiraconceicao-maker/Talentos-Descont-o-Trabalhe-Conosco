@@ -31,8 +31,20 @@ export function initFirebaseAdmin(): App {
 
   const serviceAccount = JSON.parse(readFileSync(credentialsPath, 'utf-8'));
 
+  // O bucket padrão do Storage não é inferido automaticamente pelo Admin SDK
+  // a partir da conta de serviço — sem informá-lo aqui, getStorage().bucket()
+  // (usado no script de migração para copiar currículos) falha com "Bucket
+  // name not specified or invalid". Projetos criados antes de out/2024 usam
+  // "{projectId}.appspot.com"; projetos mais novos usam
+  // "{projectId}.firebasestorage.app" — se o seu projeto for mais novo (ou o
+  // bucket tiver um nome customizado), defina a variável de ambiente
+  // FIREBASE_STORAGE_BUCKET com o nome exato (visível em Console do Firebase
+  // > Storage > topo da página de arquivos).
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET ?? `${serviceAccount.project_id}.firebasestorage.app`;
+
   return initializeApp({
     credential: cert(serviceAccount),
     projectId: serviceAccount.project_id,
+    storageBucket,
   });
 }
