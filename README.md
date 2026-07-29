@@ -177,6 +177,20 @@ para `false` (as regras de segurança exigem `active == true` **e** `role` em
 > no Firestore, ou rode `npm run create-admin` novamente com o mesmo e-mail — o script
 > reaproveita a conta existente no Authentication e atualiza o documento no Firestore.
 
+`npm run create-admin` é seguro de rodar mais de uma vez para o mesmo e-mail: ele
+verifica o que já existe (usuário no Authentication e/ou documento no Firestore) antes
+de agir e cobre os quatro cenários possíveis:
+
+- Nada existe → cria os dois, já vinculados pelo mesmo uid.
+- Só o documento no Firestore existe (ex.: criado manualmente pelo Console) → cria o
+  usuário no Authentication usando **exatamente esse ID de documento como uid**, para
+  os dois ficarem vinculados corretamente.
+- Só o usuário no Authentication existe → cria o documento em `admins/{uid}` usando o
+  uid real.
+- Os dois existem: se os IDs já batem, apenas atualiza a senha; se **não** batem
+  (documento "órfão" com um ID diferente do uid real), o script move os dados para
+  `admins/{uid-real}` e remove o documento antigo, corrigindo o vínculo automaticamente.
+
 ## 6. Populando dados fictícios para teste
 
 Com a `serviceAccountKey.json` configurada (mesmo passo do item 4):
