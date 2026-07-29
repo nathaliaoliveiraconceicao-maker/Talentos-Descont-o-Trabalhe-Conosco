@@ -45,7 +45,17 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setTenant(tenantData);
       setSettings(settingsData);
       setJobs(jobsData);
-    } catch {
+    } catch (err) {
+      // Qualquer erro aqui (inclusive "permission-denied" do Firestore, não
+      // só um tenant genuinamente inexistente) leva o visitante para a
+      // mesma tela de "não encontrado" — de propósito, para não vazar quais
+      // slugs existem. Mas o console SEMPRE recebe o erro real: se as
+      // Firestore Rules do projeto não estiverem publicadas (ex.: alguém
+      // editou firestore.rules mas esqueceu de rodar
+      // "firebase deploy --only firestore:rules"), o sintoma no navegador é
+      // idêntico a um 404 — sem este log, esse cenário é praticamente
+      // impossível de diagnosticar a distância.
+      console.error(`[TenantProvider] Falha ao carregar o tenant "${slug}":`, err);
       setNotFound(true);
     } finally {
       setLoading(false);

@@ -166,6 +166,18 @@ npm install
    firebase deploy --only firestore:rules,storage:rules
    ```
 
+   > ⚠️ **Isto precisa ser repetido manualmente toda vez que `firestore.rules` ou
+   > `storage.rules` mudar.** Publicar/mergear código no GitHub e o deploy da
+   > Vercel **não** atualizam as regras do Firebase — são sistemas totalmente
+   > independentes. Esquecer este passo depois de alterar as regras é
+   > silencioso: o app continua funcionando para quem já tinha acesso, mas
+   > qualquer leitura/escrita nova que as regras atuais (desatualizadas) não
+   > cubram passa a falhar com `permission-denied` — o que, em telas como
+   > `TenantProvider`, aparece para o visitante como um genérico "Página não
+   > encontrada", sem nenhuma pista visual do motivo real (o erro completo é
+   > logado no console do navegador, então sempre confira lá primeiro se uma
+   > página que "deveria existir" está caindo em 404).
+
 ## 3. Executando localmente
 
 ```bash
