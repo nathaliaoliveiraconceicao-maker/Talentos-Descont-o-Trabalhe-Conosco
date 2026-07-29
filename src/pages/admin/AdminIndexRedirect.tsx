@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Spinner } from '@/components/ui/Spinner';
 
-/** "/admin" apenas encaminha para o login ou para o dashboard, conforme o estado de autenticação. */
+/** "/app" apenas encaminha para o login ou para o dashboard, conforme o estado de autenticação. */
 export function AdminIndexRedirect() {
   const { isAuthorized, loading } = useAuth();
 
@@ -14,5 +14,5 @@ export function AdminIndexRedirect() {
     );
   }
 
-  return <Navigate to={isAuthorized ? '/admin/dashboard' : '/admin/login'} replace />;
+  return <Navigate to={isAuthorized ? '/app/dashboard' : '/app/login'} replace />;
 }

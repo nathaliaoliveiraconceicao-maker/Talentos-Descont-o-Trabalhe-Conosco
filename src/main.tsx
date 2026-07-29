@@ -20,7 +20,6 @@ import('./App')
     );
   })
   .catch((error: unknown) => {
-    // eslint-disable-next-line no-console
     console.error('Falha ao inicializar a aplicação:', error);
     root.render(
       <div

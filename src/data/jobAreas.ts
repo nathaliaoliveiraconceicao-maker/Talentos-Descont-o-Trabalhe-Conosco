@@ -1,26 +1,24 @@
-import type { JobAreaId } from '@/types/candidate';
+import type { TenantJobArea } from '@/types/tenant';
 
-export interface JobAreaOption {
-  id: JobAreaId;
-  label: string;
-}
-
-export const JOB_AREAS: JobAreaOption[] = [
-  { id: 'ajudante_acougue', label: 'Ajudante de Açougue' },
-  { id: 'acougueiro', label: 'Açougueiro' },
-  { id: 'padeiro', label: 'Padeiro' },
-  { id: 'ajudante_padaria', label: 'Ajudante de Padaria' },
-  { id: 'repositor_hortifruti', label: 'Repositor de Hortifrúti' },
-  { id: 'repositor', label: 'Repositor' },
-  { id: 'operador_caixa', label: 'Operador(a) de Caixa' },
-  { id: 'fiscal_caixa', label: 'Fiscal de Caixa' },
-  { id: 'administrativo', label: 'Administrativo' },
-  { id: 'atendente_frios', label: 'Atendente de Frios' },
-  { id: 'conferente', label: 'Conferente' },
-  { id: 'estoquista', label: 'Estoquista' },
-  { id: 'outra', label: 'Outra área' },
+/**
+ * Lista padrão de áreas de interesse usada para semear um tenant novo (ex.:
+ * ao cadastrar um cliente pelo painel do superadmin). Cada tenant pode
+ * customizar sua própria lista depois em tenants/{tenantId}/jobs — esta
+ * lista NÃO é mais a fonte de verdade em tempo de execução (era antes da
+ * multi-tenancy); veja src/lib/tenantApi.ts (getTenantJobAreas).
+ */
+export const DEFAULT_JOB_AREAS_SEED: TenantJobArea[] = [
+  { id: 'ajudante_acougue', label: 'Ajudante de Açougue', active: true },
+  { id: 'acougueiro', label: 'Açougueiro', active: true },
+  { id: 'padeiro', label: 'Padeiro', active: true },
+  { id: 'ajudante_padaria', label: 'Ajudante de Padaria', active: true },
+  { id: 'repositor_hortifruti', label: 'Repositor de Hortifrúti', active: true },
+  { id: 'repositor', label: 'Repositor', active: true },
+  { id: 'operador_caixa', label: 'Operador(a) de Caixa', active: true },
+  { id: 'fiscal_caixa', label: 'Fiscal de Caixa', active: true },
+  { id: 'administrativo', label: 'Administrativo', active: true },
+  { id: 'atendente_frios', label: 'Atendente de Frios', active: true },
+  { id: 'conferente', label: 'Conferente', active: true },
+  { id: 'estoquista', label: 'Estoquista', active: true },
+  { id: 'outra', label: 'Outra área', active: true },
 ];
-
-export function jobAreaLabel(id: string): string {
-  return JOB_AREAS.find((area) => area.id === id)?.label ?? id;
-}

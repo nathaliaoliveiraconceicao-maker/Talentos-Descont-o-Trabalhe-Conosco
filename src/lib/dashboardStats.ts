@@ -1,6 +1,7 @@
-import { jobAreaLabel } from '@/data/jobAreas';
+import { jobAreaLabel } from '@/lib/tenantApi';
 import { EDUCATION_LEVELS } from '@/data/educationLevels';
 import type { Candidate } from '@/types/candidate';
+import type { TenantJobArea } from '@/types/tenant';
 
 export interface ChartDatum {
   name: string;
@@ -37,7 +38,7 @@ export function countThisMonth(candidates: Candidate[]): number {
   }).length;
 }
 
-export function candidatesByArea(candidates: Candidate[]): ChartDatum[] {
+export function candidatesByArea(candidates: Candidate[], jobs: TenantJobArea[]): ChartDatum[] {
   const counts = new Map<string, number>();
   candidates.forEach((c) => {
     const area = c.interest?.mainAreaOfInterest;
@@ -45,7 +46,7 @@ export function candidatesByArea(candidates: Candidate[]): ChartDatum[] {
     counts.set(area, (counts.get(area) ?? 0) + 1);
   });
   return Array.from(counts.entries())
-    .map(([area, value]) => ({ name: jobAreaLabel(area), value }))
+    .map(([area, value]) => ({ name: jobAreaLabel(jobs, area), value }))
     .sort((a, b) => b.value - a.value);
 }
 

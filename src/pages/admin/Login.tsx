@@ -26,11 +26,11 @@ export function Login() {
   }
 
   if (isAuthorized) {
-    const redirectTo = (location.state as { from?: string } | null)?.from ?? '/admin/dashboard';
+    const redirectTo = (location.state as { from?: string } | null)?.from ?? '/app/dashboard';
     return <Navigate to={redirectTo} replace />;
   }
 
-  // Autenticado no Firebase, mas sem documento de administrador ativo (role admin/rh).
+  // Autenticado no Firebase, mas sem vínculo ativo com um tenant.
   if (user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-4">
@@ -45,8 +45,9 @@ export function Login() {
               </span>
               <h1 className="text-lg font-bold text-neutral-800">Acesso não autorizado</h1>
               <p className="text-sm text-neutral-500">
-                Sua conta ({user.email}) está autenticada, mas não possui permissão de administrador
-                ou RH ativa neste sistema. Fale com quem gerencia o painel para liberar seu acesso.
+                Sua conta ({user.email}) está autenticada, mas não possui vínculo ativo com nenhuma
+                empresa cadastrada na plataforma. Fale com quem administra sua empresa (ou com o
+                suporte da plataforma) para liberar seu acesso.
               </p>
               <Button variant="outline" onClick={logout} className="mt-2">
                 Sair e tentar outra conta
@@ -63,7 +64,7 @@ export function Login() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate('/admin/dashboard', { replace: true });
+      navigate('/app/dashboard', { replace: true });
     } catch {
       // O AuthContext já define uma mensagem de erro específica (error, acima).
     } finally {

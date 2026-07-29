@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, Eye, Filter, Inbox, Search, X } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useTenantJobs } from '@/hooks/useTenantJobs';
 import { Spinner } from '@/components/ui/Spinner';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -9,13 +11,14 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/Badge';
 import { onlyDigits } from '@/lib/masks';
-import { JOB_AREAS } from '@/data/jobAreas';
 import { STATUS_LABELS, STATUS_ORDER } from '@/types/candidate';
 
 type SortOption = 'recent' | 'oldest' | 'scoreDesc' | 'scoreAsc' | 'name';
 
 export function CandidatesList() {
-  const { candidates, loading, error } = useCandidates();
+  const { tenantId } = useAuth();
+  const { candidates, loading, error } = useCandidates(tenantId ?? undefined);
+  const JOB_AREAS = useTenantJobs(tenantId);
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -279,7 +282,7 @@ export function CandidatesList() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      to={`/admin/candidatos/${c.id}`}
+                      to={`/app/candidatos/${c.id}`}
                       className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
                     >
                       <Eye className="h-3.5 w-3.5" /> Ver

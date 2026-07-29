@@ -1,12 +1,46 @@
-export type AdminRole = 'admin' | 'rh';
+/**
+ * Papéis de usuários de um tenant (tenants/{tenantId}/users/{uid}).
+ * "superadmin" NÃO é um papel de tenant — superadmins vivem em
+ * platformAdmins/{uid}, fora de qualquer tenant (ver PlatformAdmin abaixo).
+ */
+export type TenantRole = 'owner' | 'admin' | 'rh' | 'viewer';
 
+export const TENANT_ROLE_LABELS: Record<TenantRole, string> = {
+  owner: 'Proprietário(a)',
+  admin: 'Administrador(a)',
+  rh: 'RH',
+  viewer: 'Visualizador(a)',
+};
+
+/** Papéis com permissão de escrita (alterar status, avaliações, configurações). */
+export const WRITE_ROLES: TenantRole[] = ['owner', 'admin', 'rh'];
+/** Papéis com permissão para gerenciar usuários e configurações do tenant. */
+export const MANAGE_ROLES: TenantRole[] = ['owner', 'admin'];
+
+/** tenants/{tenantId}/users/{uid} */
 export interface AdminUser {
+  uid: string;
+  tenantId: string;
+  email: string;
+  name: string;
+  role: TenantRole;
+  createdAt: string;
+  active: boolean;
+}
+
+/** platformAdmins/{uid} — usuários da própria plataforma, com acesso a todos os tenants. */
+export interface PlatformAdmin {
   uid: string;
   email: string;
   name: string;
-  role: AdminRole;
-  createdAt: string;
   active: boolean;
+  createdAt: string;
+}
+
+/** userIndex/{uid} — índice para descobrir a qual tenant um uid pertence, sem
+ * precisar de collectionGroup queries no login. */
+export interface UserIndexEntry {
+  tenantId: string;
 }
 
 export interface ScoringWeights {
@@ -33,20 +67,9 @@ export const defaultScoringWeights: ScoringWeights = {
   wellFilledProfile: 1,
 };
 
+/** tenants/{tenantId}/scoringSettings/default */
 export interface ScoringSettings {
   weights: ScoringWeights;
   updatedAt: string;
   updatedBy: string;
-}
-
-export interface RetentionSettings {
-  talentPoolRetentionMonths: number;
-  updatedAt: string;
-  updatedBy: string;
-}
-
-export interface JobArea {
-  id: string;
-  label: string;
-  active: boolean;
 }

@@ -1,16 +1,17 @@
 import { useCandidateForm } from '@/context/FormContext';
+import { useTenant } from '@/context/TenantContext';
 import { FormField } from '@/components/ui/FormField';
 import { RadioGroup } from '@/components/ui/RadioGroup';
 import { ChipMultiSelect } from '@/components/ui/ChipMultiSelect';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { JOB_AREAS } from '@/data/jobAreas';
 import type { JobAreaId } from '@/types/candidate';
 import type { Errors } from '../validation';
 import { StepShell } from './StepShell';
 import { YES_NO_OPTIONS } from './options';
 
 export function Step3Interest({ errors }: { errors: Errors }) {
+  const { jobs: JOB_AREAS } = useTenant();
   const { data, updateSection } = useCandidateForm();
   const { interest } = data;
 

@@ -1,13 +1,35 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Save, Search, ShieldAlert, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Palette,
+  Plus,
+  Save,
+  Search,
+  ShieldAlert,
+  Trash2,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getRetentionSettings, getScoringSettings, saveRetentionSettings, saveScoringSettings } from '@/lib/settingsApi';
+import { logAuditEvent } from '@/lib/auditLog';
+import { getScoringSettings, saveScoringSettings } from '@/lib/settingsApi';
+import {
+  deleteTenantJobArea,
+  getTenant,
+  getTenantJobAreas,
+  getTenantSettings,
+  saveTenantJobArea,
+  saveTenantSettings,
+  updateTenant,
+} from '@/lib/tenantApi';
 import { deleteCandidateData, listCandidates } from '@/lib/candidatesApi';
 import { defaultScoringWeights, type ScoringWeights } from '@/types/admin';
 import type { Candidate } from '@/types/candidate';
+import type { Tenant, TenantJobArea, TenantSettings } from '@/types/tenant';
+import { defaultTenantSettings } from '@/types/tenant';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
@@ -25,14 +47,26 @@ const WEIGHT_LABELS: Record<keyof ScoringWeights, string> = {
 };
 
 export function Settings() {
-  const { admin, user } = useAuth();
+  const { admin, user, tenantId } = useAuth();
   const actorName = admin?.name ?? user?.email ?? 'administrador';
 
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [brandForm, setBrandForm] = useState({ name: '', logoUrl: '', primaryColor: '', secondaryColor: '' });
+  const [savingBrand, setSavingBrand] = useState(false);
+
+  const [tenantSettings, setTenantSettings] = useState<Omit<TenantSettings, 'updatedAt' | 'updatedBy'>>(
+    defaultTenantSettings
+  );
+  const [savingContent, setSavingContent] = useState(false);
+
+  const [jobs, setJobs] = useState<TenantJobArea[]>([]);
+  const [newJobLabel, setNewJobLabel] = useState('');
+  const [savingJobs, setSavingJobs] = useState(false);
+
   const [weights, setWeights] = useState<ScoringWeights>(defaultScoringWeights);
-  const [retentionMonths, setRetentionMonths] = useState(24);
-  const [loading, setLoading] = useState(true);
   const [savingScoring, setSavingScoring] = useState(false);
-  const [savingRetention, setSavingRetention] = useState(false);
+
+  const [loading, setLoading] = useState(true);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,41 +76,109 @@ export function Settings() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (!tenantId) return;
     (async () => {
-      const [scoring, retention] = await Promise.all([getScoringSettings(), getRetentionSettings()]);
+      const [tenantData, scoring, settings, jobsData] = await Promise.all([
+        getTenant(tenantId),
+        getScoringSettings(tenantId),
+        getTenantSettings(tenantId),
+        getTenantJobAreas(tenantId),
+      ]);
+      if (tenantData) {
+        setTenant(tenantData);
+        setBrandForm({
+          name: tenantData.name,
+          logoUrl: tenantData.logoUrl ?? '',
+          primaryColor: tenantData.primaryColor,
+          secondaryColor: tenantData.secondaryColor,
+        });
+      }
       setWeights(scoring.weights);
-      setRetentionMonths(retention.talentPoolRetentionMonths);
+      setTenantSettings(settings);
+      setJobs(jobsData);
       setLoading(false);
     })();
-  }, []);
+  }, [tenantId]);
 
-  const handleSaveScoring = async () => {
-    setSavingScoring(true);
+  const flashSaved = (message: string) => {
+    setSavedMessage(message);
+    setTimeout(() => setSavedMessage(null), 4000);
+  };
+
+  const handleSaveBrand = async () => {
+    if (!tenantId) return;
+    setSavingBrand(true);
     try {
-      await saveScoringSettings(weights, actorName);
-      setSavedMessage('Pesos de pontuação atualizados com sucesso.');
+      await updateTenant(tenantId, brandForm);
+      await logAuditEvent({ tenantId, actorUid: user?.uid ?? '', actorName, action: 'brand_updated' });
+      flashSaved('Identidade visual atualizada com sucesso.');
     } finally {
-      setSavingScoring(false);
-      setTimeout(() => setSavedMessage(null), 4000);
+      setSavingBrand(false);
     }
   };
 
-  const handleSaveRetention = async () => {
-    setSavingRetention(true);
+  const handleSaveContent = async () => {
+    if (!tenantId) return;
+    setSavingContent(true);
     try {
-      await saveRetentionSettings(retentionMonths, actorName);
-      setSavedMessage('Prazo de retenção atualizado com sucesso.');
+      await saveTenantSettings(tenantId, tenantSettings, actorName);
+      await logAuditEvent({ tenantId, actorUid: user?.uid ?? '', actorName, action: 'portal_settings_updated' });
+      flashSaved('Configurações do portal atualizadas com sucesso.');
     } finally {
-      setSavingRetention(false);
-      setTimeout(() => setSavedMessage(null), 4000);
+      setSavingContent(false);
+    }
+  };
+
+  const handleAddJob = async () => {
+    if (!tenantId || !newJobLabel.trim()) return;
+    setSavingJobs(true);
+    try {
+      const id = newJobLabel
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      const area: TenantJobArea = { id: id || `area_${Date.now()}`, label: newJobLabel.trim(), active: true };
+      await saveTenantJobArea(tenantId, area);
+      setJobs((prev) => [...prev, area]);
+      setNewJobLabel('');
+    } finally {
+      setSavingJobs(false);
+    }
+  };
+
+  const handleToggleJob = async (area: TenantJobArea) => {
+    if (!tenantId) return;
+    const updated = { ...area, active: !area.active };
+    await saveTenantJobArea(tenantId, updated);
+    setJobs((prev) => prev.map((j) => (j.id === area.id ? updated : j)));
+  };
+
+  const handleDeleteJob = async (areaId: string) => {
+    if (!tenantId) return;
+    await deleteTenantJobArea(tenantId, areaId);
+    setJobs((prev) => prev.filter((j) => j.id !== areaId));
+  };
+
+  const handleSaveScoring = async () => {
+    if (!tenantId) return;
+    setSavingScoring(true);
+    try {
+      await saveScoringSettings(tenantId, weights, actorName);
+      await logAuditEvent({ tenantId, actorUid: user?.uid ?? '', actorName, action: 'scoring_weights_updated' });
+      flashSaved('Pesos de pontuação atualizados com sucesso.');
+    } finally {
+      setSavingScoring(false);
     }
   };
 
   const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
+    if (!tenantId || !searchTerm.trim()) return;
     setSearching(true);
     try {
-      const all = await listCandidates();
+      const all = await listCandidates(tenantId);
       const term = searchTerm.trim().toLowerCase();
       setSearchResults(
         all.filter(
@@ -93,10 +195,19 @@ export function Settings() {
   };
 
   const handleDelete = async () => {
-    if (!candidateToDelete) return;
+    if (!candidateToDelete || !tenantId) return;
     setDeleting(true);
     try {
-      await deleteCandidateData(candidateToDelete.id);
+      await logAuditEvent({
+        tenantId,
+        actorUid: user?.uid ?? '',
+        actorName,
+        action: 'candidate_deleted',
+        targetType: 'candidate',
+        targetId: candidateToDelete.id,
+        details: { name: candidateToDelete.personal.fullName, protocol: candidateToDelete.protocol, reason: 'lgpd_request' },
+      });
+      await deleteCandidateData(tenantId, candidateToDelete.id);
       setSearchResults((prev) => prev.filter((c) => c.id !== candidateToDelete.id));
       setCandidateToDelete(null);
     } finally {
@@ -104,13 +215,15 @@ export function Settings() {
     }
   };
 
-  if (loading) return <Spinner label="Carregando configurações…" />;
+  if (loading || !tenant) return <Spinner label="Carregando configurações…" />;
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold text-neutral-800">Configurações</h1>
-        <p className="text-sm text-neutral-500">Pontuação, retenção de dados e solicitações LGPD.</p>
+        <p className="text-sm text-neutral-500">
+          Identidade visual, textos do portal, áreas de interesse, pontuação e privacidade.
+        </p>
       </div>
 
       {savedMessage && (
@@ -118,6 +231,194 @@ export function Settings() {
           <CheckCircle2 className="h-4 w-4" /> {savedMessage}
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <h2 className="flex items-center gap-2 font-bold text-neutral-800">
+            <Palette className="h-4 w-4" /> Identidade visual
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Nome público, logotipo e cores usadas no seu portal de candidaturas.
+          </p>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Nome público" htmlFor="brandName">
+              <Input
+                id="brandName"
+                value={brandForm.name}
+                onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
+              />
+            </FormField>
+            <FormField label="URL do logotipo" htmlFor="brandLogo" hint="PNG ou SVG com fundo transparente.">
+              <Input
+                id="brandLogo"
+                value={brandForm.logoUrl}
+                onChange={(e) => setBrandForm({ ...brandForm, logoUrl: e.target.value })}
+                placeholder="https://…"
+              />
+            </FormField>
+            <FormField label="Cor primária" htmlFor="primaryColor">
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={brandForm.primaryColor}
+                  onChange={(e) => setBrandForm({ ...brandForm, primaryColor: e.target.value })}
+                  className="h-10 w-14 rounded border border-neutral-300"
+                />
+                <Input
+                  id="primaryColor"
+                  value={brandForm.primaryColor}
+                  onChange={(e) => setBrandForm({ ...brandForm, primaryColor: e.target.value })}
+                />
+              </div>
+            </FormField>
+            <FormField label="Cor secundária" htmlFor="secondaryColor">
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={brandForm.secondaryColor}
+                  onChange={(e) => setBrandForm({ ...brandForm, secondaryColor: e.target.value })}
+                  className="h-10 w-14 rounded border border-neutral-300"
+                />
+                <Input
+                  id="secondaryColor"
+                  value={brandForm.secondaryColor}
+                  onChange={(e) => setBrandForm({ ...brandForm, secondaryColor: e.target.value })}
+                />
+              </div>
+            </FormField>
+          </div>
+          <Button onClick={handleSaveBrand} loading={savingBrand} className="self-start">
+            <Save className="h-4 w-4" /> Salvar identidade visual
+          </Button>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-bold text-neutral-800">Textos do portal</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Mensagem inicial, política de privacidade, retenção de dados e mensagens de WhatsApp.
+          </p>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <FormField label="Título de destaque (hero)" htmlFor="heroTitle">
+            <Input
+              id="heroTitle"
+              value={tenantSettings.heroTitle}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, heroTitle: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Subtítulo de destaque" htmlFor="heroSubtitle">
+            <Textarea
+              id="heroSubtitle"
+              rows={2}
+              value={tenantSettings.heroSubtitle}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, heroSubtitle: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Aviso inicial (ex.: sobre não garantir contratação)" htmlFor="initialMessage">
+            <Textarea
+              id="initialMessage"
+              rows={2}
+              value={tenantSettings.initialMessage}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, initialMessage: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Texto da política de privacidade" htmlFor="privacyPolicyText">
+            <Textarea
+              id="privacyPolicyText"
+              rows={4}
+              value={tenantSettings.privacyPolicyText}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, privacyPolicyText: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Prazo de retenção do banco de talentos (meses)" htmlFor="retentionMonths">
+            <Input
+              id="retentionMonths"
+              type="number"
+              min={1}
+              max={120}
+              className="w-40"
+              value={tenantSettings.talentPoolRetentionMonths}
+              onChange={(e) =>
+                setTenantSettings({ ...tenantSettings, talentPoolRetentionMonths: Number(e.target.value) })
+              }
+            />
+          </FormField>
+          <FormField
+            label="Mensagem padrão de WhatsApp"
+            htmlFor="whatsappGenericMessage"
+            hint="Use {{nome}} e {{empresa}} — serão substituídos automaticamente."
+          >
+            <Textarea
+              id="whatsappGenericMessage"
+              rows={3}
+              value={tenantSettings.whatsappGenericMessage}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, whatsappGenericMessage: e.target.value })}
+            />
+          </FormField>
+          <FormField
+            label="Mensagem de convite para entrevista"
+            htmlFor="whatsappInterviewMessage"
+            hint="Use {{nome}}, {{empresa}}, {{data}}, {{horario}} e {{local}}."
+          >
+            <Textarea
+              id="whatsappInterviewMessage"
+              rows={3}
+              value={tenantSettings.whatsappInterviewMessage}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, whatsappInterviewMessage: e.target.value })}
+            />
+          </FormField>
+          <Button onClick={handleSaveContent} loading={savingContent} className="self-start">
+            <Save className="h-4 w-4" /> Salvar textos
+          </Button>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-bold text-neutral-800">Áreas de interesse (cargos)</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Cargos disponíveis no formulário de pré-candidatura. Desative em vez de excluir se já houver
+            candidatos vinculados.
+          </p>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <ul className="flex flex-col divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+            {jobs.map((area) => (
+              <li key={area.id} className="flex items-center justify-between gap-3 p-3">
+                <div>
+                  <p className={`text-sm font-medium ${area.active ? 'text-neutral-800' : 'text-neutral-400 line-through'}`}>
+                    {area.label}
+                  </p>
+                  <p className="text-xs text-neutral-400">{area.id}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => handleToggleJob(area)}>
+                    {area.active ? 'Desativar' : 'Ativar'}
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => handleDeleteJob(area.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nome do novo cargo"
+              value={newJobLabel}
+              onChange={(e) => setNewJobLabel(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddJob()}
+            />
+            <Button onClick={handleAddJob} loading={savingJobs}>
+              <Plus className="h-4 w-4" /> Adicionar
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -143,31 +444,6 @@ export function Settings() {
           </div>
           <Button onClick={handleSaveScoring} loading={savingScoring} className="self-start">
             <Save className="h-4 w-4" /> Salvar pontuação
-          </Button>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="font-bold text-neutral-800">Retenção de dados (LGPD)</h2>
-          <p className="mt-1 text-xs text-neutral-500">
-            Prazo, em meses, para manutenção dos dados de candidatos no banco de talentos.
-          </p>
-        </CardHeader>
-        <CardBody className="flex flex-wrap items-end gap-4">
-          <FormField label="Meses de retenção" htmlFor="retentionMonths">
-            <Input
-              id="retentionMonths"
-              type="number"
-              min={1}
-              max={120}
-              value={retentionMonths}
-              onChange={(e) => setRetentionMonths(Number(e.target.value))}
-              className="w-40"
-            />
-          </FormField>
-          <Button onClick={handleSaveRetention} loading={savingRetention}>
-            <Save className="h-4 w-4" /> Salvar prazo
           </Button>
         </CardBody>
       </Card>

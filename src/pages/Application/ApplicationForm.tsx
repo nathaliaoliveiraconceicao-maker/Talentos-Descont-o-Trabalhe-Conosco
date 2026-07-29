@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, ChevronRight, Send } from 'lucide-react';
 import { FormProvider, useCandidateForm, TOTAL_STEPS } from '@/context/FormContext';
+import { useTenant } from '@/context/TenantContext';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { checkRecentDuplicate, submitCandidate, uploadResume } from '@/lib/candidatesApi';
+import { checkRecentDuplicate, submitCandidate } from '@/lib/candidatesApi';
+import { getScoringSettings } from '@/lib/settingsApi';
+import { jobAreaLabel } from '@/lib/tenantApi';
 import { validateStep, type Errors } from './validation';
 import { Step1Personal } from './steps/Step1Personal';
 import { Step2Contact } from './steps/Step2Contact';
@@ -31,6 +34,7 @@ const STEP_LABELS = [
 
 function ApplicationFormInner() {
   const navigate = useNavigate();
+  const { tenant, jobs } = useTenant();
   const { data, currentStep, nextStep, prevStep, resumeFile, resetForm } = useCandidateForm();
   const [errors, setErrors] = useState<Errors>({});
   const [showConfirm, setShowConfirm] = useState(false);
@@ -60,7 +64,7 @@ function ApplicationFormInner() {
 
     setSubmitError(null);
     try {
-      const isDuplicate = await checkRecentDuplicate(data.contact.email, data.contact.whatsapp);
+      const isDuplicate = await checkRecentDuplicate(tenant.tenantId, data.contact.email, data.contact.whatsapp);
       setDuplicateWarning(isDuplicate);
     } catch {
       setDuplicateWarning(false);
@@ -72,10 +76,10 @@ function ApplicationFormInner() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const resume = resumeFile ? await uploadResume(resumeFile) : null;
-      const { protocol } = await submitCandidate({ ...data, resume });
+      const scoring = await getScoringSettings(tenant.tenantId);
+      const { protocol } = await submitCandidate(tenant.tenantId, data, resumeFile, scoring.weights);
       resetForm();
-      navigate('/candidatura/confirmacao', { state: { protocol } });
+      navigate(`/${tenant.slug}/candidatura/confirmacao`, { state: { protocol } });
     } catch (err) {
       console.error(err);
       setSubmitError('Não foi possível enviar sua candidatura agora. Verifique sua conexão e tente novamente.');
@@ -183,7 +187,8 @@ function ApplicationFormInner() {
               <strong>E-mail:</strong> {data.contact.email || '—'}
             </li>
             <li>
-              <strong>Área de maior interesse:</strong> {data.interest.mainAreaOfInterest || '—'}
+              <strong>Área de maior interesse:</strong>{' '}
+              {data.interest.mainAreaOfInterest ? jobAreaLabel(jobs, data.interest.mainAreaOfInterest) : '—'}
             </li>
           </ul>
         </div>
@@ -193,8 +198,9 @@ function ApplicationFormInner() {
 }
 
 export function ApplicationForm() {
+  const { tenant } = useTenant();
   return (
-    <FormProvider>
+    <FormProvider tenantSlug={tenant.slug}>
       <ApplicationFormInner />
     </FormProvider>
   );

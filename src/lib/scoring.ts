@@ -7,6 +7,30 @@ export interface ScoreResult {
 }
 
 /**
+ * Verifica se o candidato tem experiência compatível com a área de maior
+ * interesse, por palavras-chave no ID da área (ex.: "caixa", "acougue").
+ * Como cada tenant define suas próprias áreas em tenants/{tenantId}/jobs,
+ * não é possível ter um mapeamento fixo por ID como no Descontão original —
+ * esta heurística cobre os casos mais comuns de varejo/supermercado sem
+ * exigir configuração adicional. Um mapeamento por tenant totalmente
+ * customizável é um possível refinamento futuro (ver README).
+ */
+function hasExperienceInArea(data: CandidateFormData): boolean {
+  const area = data.interest.mainAreaOfInterest.toLowerCase();
+  const exp = data.experience;
+  const keywordChecks: [string[], boolean][] = [
+    [['caixa'], exp.hasCashierExperience === 'sim'],
+    [['repositor', 'reposicao', 'hortifruti'], exp.hasRestockingExperience === 'sim'],
+    [['acougue', 'acougueiro'], exp.hasButcherExperience === 'sim'],
+    [['padaria', 'padeiro'], exp.hasBakeryExperience === 'sim'],
+    [['estoque', 'estoquista', 'conferente'], exp.hasStockExperience === 'sim'],
+    [['atendente', 'atendimento', 'frios'], exp.hasCustomerServiceExperience === 'sim'],
+    [['lideranca', 'gerente', 'supervisor'], exp.hasLeadershipExperience === 'sim'],
+  ];
+  return keywordChecks.some(([keywords, hasExp]) => hasExp && keywords.some((k) => area.includes(k)));
+}
+
+/**
  * Pontuação automática usada apenas como apoio à triagem.
  * A decisão final sobre cada candidato deve sempre ser humana.
  */
@@ -28,21 +52,7 @@ export function calculateScore(
   breakdown.weekendAvailability =
     data.availability.saturdays || data.availability.sundays ? weights.weekendAvailability : 0;
 
-  const mainArea = data.interest.mainAreaOfInterest;
-  const areaExperienceMap: Record<string, boolean> = {
-    operador_caixa: data.experience.hasCashierExperience === 'sim',
-    fiscal_caixa: data.experience.hasCashierExperience === 'sim',
-    repositor: data.experience.hasRestockingExperience === 'sim',
-    repositor_hortifruti: data.experience.hasRestockingExperience === 'sim',
-    acougueiro: data.experience.hasButcherExperience === 'sim',
-    ajudante_acougue: data.experience.hasButcherExperience === 'sim',
-    padeiro: data.experience.hasBakeryExperience === 'sim',
-    ajudante_padaria: data.experience.hasBakeryExperience === 'sim',
-    estoquista: data.experience.hasStockExperience === 'sim',
-    conferente: data.experience.hasStockExperience === 'sim',
-    atendente_frios: data.experience.hasCustomerServiceExperience === 'sim',
-  };
-  breakdown.areaExperience = mainArea && areaExperienceMap[mainArea] ? weights.areaExperience : 0;
+  breakdown.areaExperience = hasExperienceInArea(data) ? weights.areaExperience : 0;
 
   breakdown.supermarketExperience =
     data.experience.workedInSupermarket === 'sim' ? weights.supermarketExperience : 0;

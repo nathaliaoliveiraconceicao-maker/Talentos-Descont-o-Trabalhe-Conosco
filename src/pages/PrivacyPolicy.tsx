@@ -1,15 +1,21 @@
 import { Card, CardBody } from '@/components/ui/Card';
+import { useTenant } from '@/context/TenantContext';
 
 export function PrivacyPolicy() {
+  const { tenant, settings } = useTenant();
+
   return (
     <div className="container-page max-w-3xl py-12">
       <h1 className="text-2xl font-bold text-neutral-800 sm:text-3xl">Política de Privacidade</h1>
       <p className="mt-2 text-sm text-neutral-500">
-        Última atualização: {new Date().toLocaleDateString('pt-BR')}
+        {tenant.name} · Última atualização: {new Date(settings.updatedAt).toLocaleDateString('pt-BR')}
       </p>
 
       <Card className="mt-8">
         <CardBody className="prose prose-sm max-w-none space-y-5 py-6 text-neutral-700">
+          <section>
+            <p>{settings.privacyPolicyText}</p>
+          </section>
           <section>
             <h2 className="text-lg font-bold text-neutral-800">1. Quais dados coletamos</h2>
             <p>
@@ -25,25 +31,25 @@ export function PrivacyPolicy() {
             <h2 className="text-lg font-bold text-neutral-800">2. Finalidade do tratamento</h2>
             <p>
               Os dados fornecidos são utilizados exclusivamente para processos de recrutamento,
-              seleção e formação de banco de talentos do Supermercado Descontão. Não vendemos nem
-              utilizamos suas informações para fins de publicidade ou compartilhamos com terceiros
-              fora dessa finalidade.
+              seleção e formação de banco de talentos da {tenant.name}. Não vendemos nem utilizamos
+              suas informações para fins de publicidade ou compartilhamos com terceiros fora dessa
+              finalidade.
             </p>
           </section>
           <section>
             <h2 className="text-lg font-bold text-neutral-800">3. Armazenamento e segurança</h2>
             <p>
-              As informações são armazenadas em ambiente protegido (Firebase), com acesso restrito a
-              administradores autenticados e autorizados pela equipe do Supermercado Descontão.
+              As informações são armazenadas em ambiente protegido (Firebase), com acesso restrito à
+              equipe de recrutamento da {tenant.name}, autenticada e autorizada para esse fim.
             </p>
           </section>
           <section>
             <h2 className="text-lg font-bold text-neutral-800">4. Retenção e exclusão</h2>
             <p>
-              Os dados de candidatos incluídos no banco de talentos são mantidos pelo prazo
-              configurado pela equipe de recrutamento, podendo ser revisado periodicamente. Você pode
-              solicitar a exclusão dos seus dados a qualquer momento entrando em contato com a nossa
-              equipe; um administrador poderá localizar e excluir seu cadastro mediante solicitação.
+              Os dados de candidatos incluídos no banco de talentos são mantidos por até{' '}
+              {settings.talentPoolRetentionMonths} meses, podendo ser revisados periodicamente. Você
+              pode solicitar a exclusão dos seus dados a qualquer momento entrando em contato com a
+              nossa equipe.
             </p>
           </section>
           <section>

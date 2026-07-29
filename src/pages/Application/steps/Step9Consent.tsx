@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { useCandidateForm } from '@/context/FormContext';
+import { useTenant } from '@/context/TenantContext';
 import { Checkbox } from '@/components/ui/Checkbox';
 import type { Errors } from '../validation';
 import { StepShell } from './StepShell';
 
 export function Step9Consent({ errors }: { errors: Errors }) {
+  const { tenant } = useTenant();
   const { data, updateSection } = useCandidateForm();
   const { consent } = data;
 
@@ -15,12 +17,15 @@ export function Step9Consent({ errors }: { errors: Errors }) {
 
   return (
     <StepShell title="Consentimento" description="Última etapa antes de enviar sua pré-candidatura.">
-      <div className="flex items-start gap-3 rounded-xl2 border border-brand-blue-200 bg-brand-blue-50 p-4">
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-blue-700" aria-hidden="true" />
-        <p className="text-sm text-brand-blue-900">
+      <div
+        className="flex items-start gap-3 rounded-xl2 border p-4"
+        style={{ borderColor: `${tenant.primaryColor}55`, backgroundColor: `${tenant.primaryColor}0d` }}
+      >
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" style={{ color: tenant.primaryColor }} aria-hidden="true" />
+        <p className="text-sm" style={{ color: tenant.primaryColor }}>
           Seus dados não serão vendidos nem utilizados para fins de publicidade. As informações são
-          usadas exclusivamente pela equipe de recrutamento do Supermercado Descontão. Saiba mais na{' '}
-          <Link to="/politica-de-privacidade" target="_blank" className="font-semibold underline">
+          usadas exclusivamente pela equipe de recrutamento da {tenant.name}. Saiba mais na{' '}
+          <Link to={`/${tenant.slug}/politica-de-privacidade`} target="_blank" className="font-semibold underline">
             Política de Privacidade
           </Link>
           .
@@ -40,7 +45,7 @@ export function Step9Consent({ errors }: { errors: Errors }) {
 
         <Checkbox
           id="authorizesDataProcessing"
-          label="Autorizo o tratamento dos meus dados exclusivamente para processos de recrutamento, seleção e formação de banco de talentos do Supermercado Descontão."
+          label={`Autorizo o tratamento dos meus dados exclusivamente para processos de recrutamento, seleção e formação de banco de talentos da ${tenant.name}.`}
           checked={consent.authorizesDataProcessing}
           onChange={(e) => set('authorizesDataProcessing', e.target.checked)}
         />

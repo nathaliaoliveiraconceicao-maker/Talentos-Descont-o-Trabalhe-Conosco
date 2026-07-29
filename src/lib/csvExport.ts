@@ -1,6 +1,7 @@
-import { jobAreaLabel } from '@/data/jobAreas';
+import { jobAreaLabel } from '@/lib/tenantApi';
 import { EDUCATION_LEVELS } from '@/data/educationLevels';
 import { STATUS_LABELS, type Candidate } from '@/types/candidate';
+import type { TenantJobArea } from '@/types/tenant';
 
 function escapeCsvValue(value: unknown): string {
   const str = value === null || value === undefined ? '' : String(value);
@@ -19,7 +20,11 @@ function educationLabel(level: string): string {
  * observações internas e avaliações do RH não são incluídas — apenas dados do
  * próprio candidato, conforme exigido antes de qualquer exportação.
  */
-export function candidatesToCsvRows(candidates: Candidate[], includeRestricted: boolean): string[][] {
+export function candidatesToCsvRows(
+  candidates: Candidate[],
+  jobs: TenantJobArea[],
+  includeRestricted: boolean
+): string[][] {
   const baseHeader = [
     'Protocolo',
     'Nome',
@@ -54,7 +59,7 @@ export function candidatesToCsvRows(candidates: Candidate[], includeRestricted: 
       c.contact.email,
       c.personal.city,
       c.personal.neighborhood,
-      jobAreaLabel(c.interest.mainAreaOfInterest),
+      jobAreaLabel(jobs, c.interest.mainAreaOfInterest),
       c.interest.isFirstJob === 'sim' ? 'Sim' : 'Não',
       c.experience.workedInSupermarket === 'sim' ? 'Sim' : 'Não',
       c.education.educationLevel ? educationLabel(c.education.educationLevel) : '',

@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { AlertCircle, AlertTriangle, Eye, Inbox, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useTenantJobs } from '@/hooks/useTenantJobs';
 import { deleteCandidateData, updateCandidateStatus } from '@/lib/candidatesApi';
-import { getRetentionSettings } from '@/lib/settingsApi';
-import { jobAreaLabel } from '@/data/jobAreas';
+import { getTenantSettings, jobAreaLabel } from '@/lib/tenantApi';
 import type { Candidate } from '@/types/candidate';
 import { Spinner } from '@/components/ui/Spinner';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -18,8 +18,9 @@ function daysSince(dateIso: string): number {
 }
 
 export function TalentPool() {
-  const { admin, user } = useAuth();
-  const { candidates, loading, error, reload } = useCandidates();
+  const { admin, user, tenantId } = useAuth();
+  const { candidates, loading, error, reload } = useCandidates(tenantId ?? undefined);
+  const jobs = useTenantJobs(tenantId);
   const [search, setSearch] = useState('');
   const [retentionMonths, setRetentionMonths] = useState(24);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
@@ -29,8 +30,9 @@ export function TalentPool() {
   const actorName = admin?.name ?? user?.email ?? 'administrador';
 
   useEffect(() => {
-    getRetentionSettings().then((s) => setRetentionMonths(s.talentPoolRetentionMonths));
-  }, []);
+    if (!tenantId) return;
+    getTenantSettings(tenantId).then((s) => setRetentionMonths(s.talentPoolRetentionMonths));
+  }, [tenantId]);
 
   const pool = useMemo(
     () => candidates.filter((c) => c.status === 'banco_talentos'),
@@ -44,16 +46,17 @@ export function TalentPool() {
       (c) =>
         c.personal.fullName.toLowerCase().includes(term) ||
         c.personal.neighborhood.toLowerCase().includes(term) ||
-        jobAreaLabel(c.interest.mainAreaOfInterest).toLowerCase().includes(term)
+        jobAreaLabel(jobs, c.interest.mainAreaOfInterest).toLowerCase().includes(term)
     );
-  }, [pool, search]);
+  }, [pool, search, jobs]);
 
   const retentionDays = retentionMonths * 30;
 
   const handleReactivate = async (candidate: Candidate) => {
+    if (!tenantId) return;
     setReactivatingId(candidate.id);
     try {
-      await updateCandidateStatus(candidate.id, 'em_analise', actorName, {
+      await updateCandidateStatus(tenantId, candidate.id, 'em_analise', actorName, {
         note: 'Reativado do banco de talentos para um novo processo seletivo.',
         changedByUid: user?.uid,
         previousStatus: candidate.status,
@@ -65,10 +68,10 @@ export function TalentPool() {
   };
 
   const handleDelete = async () => {
-    if (!candidateToDelete) return;
+    if (!candidateToDelete || !tenantId) return;
     setDeleting(true);
     try {
-      await deleteCandidateData(candidateToDelete.id);
+      await deleteCandidateData(tenantId, candidateToDelete.id);
       setCandidateToDelete(null);
       await reload();
     } finally {
@@ -141,7 +144,7 @@ export function TalentPool() {
                       <td className="px-4 py-3 font-medium text-neutral-800">{c.personal.fullName}</td>
                       <td className="px-4 py-3 text-neutral-600">{c.personal.neighborhood}</td>
                       <td className="px-4 py-3 text-neutral-600">
-                        {jobAreaLabel(c.interest.mainAreaOfInterest)}
+                        {jobAreaLabel(jobs, c.interest.mainAreaOfInterest)}
                       </td>
                       <td className="px-4 py-3 text-neutral-600">{stored} dias</td>
                       <td className="px-4 py-3">
@@ -157,7 +160,7 @@ export function TalentPool() {
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <Link
-                            to={`/admin/candidatos/${c.id}`}
+                            to={`/app/candidatos/${c.id}`}
                             className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
                           >
                             <Eye className="h-3.5 w-3.5" /> Ver
