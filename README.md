@@ -152,6 +152,16 @@ com o **Firebase Admin SDK**, que tem privilégios elevados.
    documento correspondente em `admins/{uid}` no Firestore, com `active: true`.
 5. Acesse `/admin/login` com o e-mail e senha cadastrados.
 
+> ⚠️ **Erro comum**: criar apenas o documento em `admins/{uid}` no Firestore (pelo
+> Console) **não é suficiente** para o login funcionar — é preciso que exista também
+> um usuário com esse e-mail/senha no **Firebase Authentication** (aba
+> "Authentication > Users" no Console), com o UID do usuário **igual** ao ID do
+> documento em `admins/`. Se você criou o documento manualmente e o login está
+> retornando "Não existe uma conta com esse e-mail e senha...", é porque falta esse
+> usuário no Authentication — use `npm run create-admin` (ele cria os dois de uma vez
+> e vincula os UIDs corretamente) ou crie o usuário manualmente em Authentication e
+> copie o UID gerado como ID do documento em `admins/`.
+
 ## 5. Cadastrando outros administradores/RH
 
 Basta rodar `npm run create-admin` novamente quantas vezes forem necessárias — cada

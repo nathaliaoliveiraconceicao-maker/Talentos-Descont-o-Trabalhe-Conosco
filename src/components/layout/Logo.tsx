@@ -10,7 +10,7 @@ export function Logo({ className = 'h-12' }: { className?: string }) {
       alt="Supermercado Descontão"
       className={`w-auto ${className}`}
       width={480}
-      height={190}
+      height={170}
     />
   );
 }

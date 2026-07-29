@@ -1,46 +1,44 @@
 <!--
   ÁREA RESERVADA PARA A LOGOMARCA OFICIAL DO SUPERMERCADO DESCONTÃO
-  Esta é uma recriação aproximada da logo oficial (não o arquivo original em alta
-  resolução). Substitua este arquivo por um export oficial (SVG ou PNG com fundo
-  transparente) assim que disponível, mantendo o nome "logo-placeholder.svg" — ou
-  aponte src/components/layout/Logo.tsx para o novo arquivo.
+
+  Esta é uma recriação simplificada (não o arquivo oficial em alta resolução).
+  Assim que tiver o arquivo oficial (PNG com fundo transparente ou SVG), salve-o
+  em public/ e aponte src/components/layout/Logo.tsx para ele — ou substitua
+  este arquivo mantendo o nome "logo-placeholder.svg".
+
+  Nota de design: as formas foram desenhadas sem sobreposição entre o cartão
+  azul e a faixa vermelha (há um espaço limpo entre as duas) para evitar
+  qualquer artefato visual de corte ou duplicação ao redimensionar.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 190" role="img" aria-label="Descontão Supermercado">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 170" role="img" aria-label="Descontão Supermercado">
   <defs>
     <linearGradient id="blueCard" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#1f84b0" />
       <stop offset="1" stop-color="#124862" />
     </linearGradient>
-    <linearGradient id="redBanner" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#d32f2b" />
-      <stop offset="1" stop-color="#b8221f" />
-    </linearGradient>
   </defs>
 
-  <!-- escudo/faixa azul atrás do cartão -->
-  <path d="M28 78 h122 v78 l-61 30 -61 -30 Z" fill="#125877" />
-
-  <!-- cartão azul com o carrinho -->
-  <rect x="18" y="10" width="150" height="150" rx="26" fill="url(#blueCard)" />
+  <!-- Cartão azul com o carrinho -->
+  <rect x="8" y="8" width="140" height="140" rx="22" fill="url(#blueCard)" />
   <g stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M38 58 h20 l8 14 h64 l-12 42 h-46 l-14 -50 h-20" />
-    <circle cx="76" cy="132" r="9" fill="#ffffff" stroke="none" />
-    <circle cx="122" cy="132" r="9" fill="#ffffff" stroke="none" />
+    <path d="M28 52 h18 l7 13 h58 l-11 38 h-42 l-13 -45 h-17" />
+    <circle cx="63" cy="118" r="8" fill="#ffffff" stroke="none" />
+    <circle cx="103" cy="118" r="8" fill="#ffffff" stroke="none" />
   </g>
-  <rect x="82" y="46" width="22" height="18" rx="2" fill="#ffffff" transform="rotate(-8 93 55)" />
-  <rect x="104" y="44" width="22" height="18" rx="2" fill="#ffffff" transform="rotate(6 115 53)" />
-  <path d="M30 78 h18" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />
-  <path d="M24 90 h18" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.85" />
+  <rect x="68" y="41" width="20" height="16" rx="2" fill="#ffffff" transform="rotate(-8 78 49)" />
+  <rect x="88" y="39" width="20" height="16" rx="2" fill="#ffffff" transform="rotate(6 98 47)" />
 
-  <!-- faixa vermelha com o nome -->
-  <path d="M150 34 H452 a10 10 0 0 1 10 10 v56 a10 10 0 0 1 -10 10 H392 l-30 26 h-212 a10 10 0 0 1 -10 -10 V44 a10 10 0 0 1 10 -10 Z" fill="url(#redBanner)" />
-  <text x="172" y="88" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="46" letter-spacing="1"
-        fill="#ffffff" stroke="#791a19" stroke-width="1.5" paint-order="stroke">
-    DESCONT<tspan fill="#ffd94d" stroke="#94480e">Ã</tspan>O
+  <!-- Faixa vermelha com o nome (sem sobreposição com o cartão azul) -->
+  <rect x="166" y="22" width="306" height="92" rx="14" fill="#d32f2b" />
+  <text x="319" y="80" text-anchor="middle" dominant-baseline="middle"
+        font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="42" letter-spacing="1"
+        fill="#ffffff">
+    DESCONT<tspan fill="#ffd94d">Ã</tspan>O
   </text>
 
   <!-- SUPERMERCADO -->
-  <text x="172" y="128" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="26" letter-spacing="4" fill="#1a1a1a">
+  <text x="319" y="150" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="24" letter-spacing="4" fill="#1a1a1a">
     SUPERMERCADO
   </text>
 </svg>

@@ -10,12 +10,11 @@ import { Card, CardBody } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 
 export function Login() {
-  const { user, isAuthorized, loading, login, logout } = useAuth();
+  const { user, isAuthorized, loading, error, login, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (loading) {
@@ -61,13 +60,12 @@ export function Login() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     setSubmitting(true);
     try {
       await login(email, password);
       navigate('/admin/dashboard', { replace: true });
     } catch {
-      setError('E-mail ou senha inválidos.');
+      // O AuthContext já define uma mensagem de erro específica (error, acima).
     } finally {
       setSubmitting(false);
     }
