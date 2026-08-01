@@ -84,6 +84,7 @@ Poppins (títulos) + Inter (interface), ícones lineares.
 │   ├── createSuperAdmin.ts         # cria o primeiro superadmin da plataforma
 │   ├── createAdmin.ts              # (legado) cria usuário na coleção antiga "admins"
 │   ├── migrateToTenant.ts          # migra o Descontão para tenants/descontao
+│   ├── renameTenant.ts             # troca o slug/tenantId de um tenant já migrado
 │   └── seedMockData.ts             # popula candidatos fictícios (coleções legadas)
 ├── tests/
 │   └── rules/runAll.mjs            # testes de isolamento das Rules no Emulator Suite
@@ -280,6 +281,25 @@ O que ele faz (idempotente — seguro rodar mais de uma vez):
 novas `firestore.rules` negam leitura/escrita do cliente nelas), mas continuam no banco
 como origem/backup. Depois de conferir o relatório e validar que `/app` está 100%
 funcional com os dados migrados, a remoção é **manual**, pelo Console do Firebase.
+
+### Renomeando o slug de um tenant já migrado
+
+Para trocar o slug/tenantId de um tenant que já existe em `tenants/{tenantId}`
+(ex.: anonimizar a URL pública de um cliente piloto), use:
+
+```bash
+npm run rename-tenant -- <de> <para>
+# Ex.: npm run rename-tenant -- descontao cliente01
+```
+
+Copia o documento do tenant e todas as subcoleções (usuários, candidatos, vagas,
+avaliações, histórico, pontuação, configurações) para o novo ID, atualiza
+`userIndex/{uid}` de cada usuário migrado (senão o login continuaria resolvendo para
+o tenant antigo) e copia currículos no Storage, se houver. **O nome público do
+negócio (`tenant.name`, logo, cores) não muda** — só o slug/URL interno. O tenant
+antigo nunca é apagado: fica marcado `active: false` (mostra "portal indisponível"),
+com os dados preservados para auditoria. Idempotente, como os demais scripts de
+migração.
 
 ## 8. Populando dados fictícios para teste
 
