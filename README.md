@@ -2,8 +2,7 @@
 
 Plataforma SaaS multi-tenant (multiempresa) de recrutamento, comercializada por
 assinatura: pré-candidatura, triagem, relatórios e banco de talentos, personalizável
-para qualquer negócio (varejo, serviços, escolas, indústria etc.). Cada cliente (ex.:
-**Supermercado Descontão**, primeiro tenant piloto) tem seu próprio portal público de
+para qualquer negócio (varejo, serviços, escolas, indústria etc.). Cada cliente tem seu próprio portal público de
 candidatura, painel de RH, candidatos, relatórios, critérios de pontuação e identidade
 visual — tudo isolado dos demais clientes, dentro de **uma única base de código, um
 único deploy e um único projeto Firebase**.
@@ -187,7 +186,7 @@ npm run dev
 A aplicação estará disponível em `http://localhost:5173`.
 
 - Landing da plataforma: `http://localhost:5173/`
-- Portal público de um cliente: `http://localhost:5173/{slug}` (ex.: `/descontao`)
+- Portal público de um cliente: `http://localhost:5173/{slug}` (ex.: `/cliente01`)
 - Formulário de candidatura: `http://localhost:5173/{slug}/candidatura`
 - Painel do cliente (RH): `http://localhost:5173/app` (redireciona para `/app/login` ou
   `/app/dashboard`, conforme a sessão)
