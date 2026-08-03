@@ -92,4 +92,11 @@ export interface TenantJobArea {
   id: string;
   label: string;
   active: boolean;
+  /**
+   * Substitui inteiramente a configuração geral da empresa de triagem
+   * comportamental (tenants/{tenantId}/settings/behavioralScreening) só
+   * para candidaturas desta vaga. null/ausente = usa a configuração geral.
+   * Ver src/types/behavioralProfile.ts#resolveBehavioralScreeningSettings.
+   */
+  behavioralScreeningSettings?: import('./behavioralProfile').BehavioralScreeningSettings | null;
 }

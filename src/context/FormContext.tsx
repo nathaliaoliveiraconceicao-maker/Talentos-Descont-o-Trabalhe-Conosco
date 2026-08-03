@@ -2,12 +2,15 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { emptyCandidateFormData, type CandidateFormData } from '@/types/candidate';
 
-export const TOTAL_STEPS = 9;
-
 interface FormContextValue {
   data: CandidateFormData;
   updateSection: <K extends keyof CandidateFormData>(section: K, value: CandidateFormData[K]) => void;
   currentStep: number;
+  /**
+   * Sem limite superior fixo aqui de propósito — o número de etapas varia
+   * por tenant (a etapa "Perfil comportamental" só existe quando a triagem
+   * está ativa), então quem chama decide o teto real (ver ApplicationForm.tsx).
+   */
   goToStep: (step: number) => void;
   nextStep: () => void;
   prevStep: () => void;
@@ -36,7 +39,7 @@ export function FormProvider({ tenantSlug, children }: FormProviderProps) {
   };
 
   const goToStep = (step: number) => {
-    setCurrentStep(Math.min(Math.max(step, 1), TOTAL_STEPS));
+    setCurrentStep(Math.max(step, 1));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

@@ -1,14 +1,18 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { getTenant, getTenantJobAreas, getTenantSettings } from '@/lib/tenantApi';
+import { getBehavioralScreeningSettings } from '@/lib/behavioralScreeningApi';
 import { isTenantOperational, type Tenant, type TenantSettings } from '@/types/tenant';
 import type { TenantJobArea } from '@/types/tenant';
+import type { BehavioralScreeningSettings } from '@/types/behavioralProfile';
 import { Spinner } from '@/components/ui/Spinner';
 
 interface TenantContextValue {
   tenant: Tenant;
   settings: TenantSettings;
   jobs: TenantJobArea[];
+  /** Configuração GERAL da empresa para a triagem comportamental — uma vaga específica pode substituí-la (ver TenantJobArea.behavioralScreeningSettings). */
+  behavioralScreeningSettings: BehavioralScreeningSettings;
   reload: () => Promise<void>;
 }
 
@@ -25,6 +29,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [jobs, setJobs] = useState<TenantJobArea[]>([]);
+  const [behavioralScreeningSettings, setBehavioralScreeningSettings] = useState<BehavioralScreeningSettings | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -38,13 +45,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         setNotFound(true);
         return;
       }
-      const [settingsData, jobsData] = await Promise.all([
+      const [settingsData, jobsData, behavioralData] = await Promise.all([
         getTenantSettings(slug),
         getTenantJobAreas(slug),
+        getBehavioralScreeningSettings(slug),
       ]);
       setTenant(tenantData);
       setSettings(settingsData);
       setJobs(jobsData);
+      setBehavioralScreeningSettings(behavioralData);
     } catch (err) {
       // Qualquer erro aqui (inclusive "permission-denied" do Firestore, não
       // só um tenant genuinamente inexistente) leva o visitante para a
@@ -75,7 +84,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  if (notFound || !tenant || !settings) {
+  if (notFound || !tenant || !settings || !behavioralScreeningSettings) {
     return <Navigate to="/nao-encontrado" replace />;
   }
 
@@ -91,7 +100,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TenantContext.Provider value={{ tenant, settings, jobs, reload: load }}>
+    <TenantContext.Provider
+      value={{ tenant, settings, jobs, behavioralScreeningSettings, reload: load }}
+    >
       {children}
     </TenantContext.Provider>
   );

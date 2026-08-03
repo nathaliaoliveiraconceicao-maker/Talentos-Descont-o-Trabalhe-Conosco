@@ -1,3 +1,5 @@
+import type { BehavioralProfile, BehavioralProfileConsent } from './behavioralProfile';
+
 export type ContactPreference = 'whatsapp' | 'ligacao' | 'email';
 
 /**
@@ -193,10 +195,21 @@ export interface Candidate {
   evaluation?: CandidateEvaluation;
 }
 
+/**
+ * behavioralProfile/behavioralProfileConsent existem só no RASCUNHO local do
+ * formulário (CandidateFormData) — nunca são gravados no documento principal
+ * de Candidate. No envio, submitCandidate() os grava numa subcoleção restrita
+ * separada (tenants/{t}/candidates/{c}/behavioralProfile/data), porque o
+ * Firestore só isola leitura por documento inteiro, não por campo — ver
+ * src/lib/behavioralProfileApi.ts.
+ */
 export type CandidateFormData = Omit<
   Candidate,
   'id' | 'tenantId' | 'protocol' | 'status' | 'score' | 'scoreBreakdown' | 'createdAt' | 'updatedAt' | 'evaluation'
->;
+> & {
+  behavioralProfile?: BehavioralProfile;
+  behavioralProfileConsent?: BehavioralProfileConsent;
+};
 
 export const emptyCandidateFormData: CandidateFormData = {
   personal: {

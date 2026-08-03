@@ -38,6 +38,7 @@ Poppins (títulos) + Inter (interface), ícones lineares.
 - [15. Sistema de pontuação](#15-sistema-de-pontuação)
 - [16. Estrutura final das coleções do Firestore](#16-estrutura-final-das-coleções-do-firestore)
 - [17. Testes de regras (Firebase Emulator Suite)](#17-testes-de-regras-firebase-emulator-suite)
+- [18. Triagem emocional e perfil comportamental](#18-triagem-emocional-e-perfil-comportamental)
 - [Checklist final de testes](#checklist-final-de-testes)
 - [Riscos e etapas pendentes](#riscos-e-etapas-pendentes)
 
@@ -649,11 +650,14 @@ candidato deve sempre ser tomada por um recrutador humano.
 tenants/{tenantId}                         # tenantId == slug
   ├── users/{uid}                          # owner | admin | rh | viewer
   ├── candidates/{candidateId}
+  │     ├── behavioralProfile/data         # respostas restritas de perfil comportamental (owner/admin/rh)
+  │     └── evaluations/{id}               # observações do RH sobre o perfil comportamental (owner/admin/rh)
   ├── jobs/{jobId}                         # áreas de interesse (cargos) do tenant
   ├── evaluations/{id}                     # log imutável de avaliações do RH
   ├── statusHistory/{id}                   # log imutável de mudanças de status
   ├── scoringSettings/default              # pesos do sistema de pontuação
   ├── settings/general                     # textos do portal, retenção, WhatsApp
+  ├── settings/behavioralScreening         # configuração geral de triagem comportamental
   └── auditLogs/{id}                       # log imutável de ações administrativas
 
 platformAdmins/{uid}                       # superadmins da plataforma (fora de tenants)
@@ -677,21 +681,26 @@ Campos principais por coleção:
 | --- | --- |
 | `tenants/{tenantId}` | `tenantId`, `slug`, `name`, `legalName`, `logoUrl` (⚠️ legado, não usado pela UI — ver seção de identidade visual), `primaryColor`, `secondaryColor`, `email`, `phone`, `address`, `city`, `state`, `active`, `planId`, `subscriptionStatus`, `subscriptionStartedAt`, `subscriptionEndsAt`, `createdAt`, `updatedAt` |
 | `tenants/{t}/users/{uid}` | `uid`, `tenantId`, `email`, `name`, `role` (`owner`\|`admin`\|`rh`\|`viewer`), `active`, `invitationStatus` (`pending`\|`accepted`\|`expired`\|`canceled`, opcional — ausente = tratado como `accepted`), `invitedAt`, `invitedBy`, `invitationSentAt`, `passwordConfiguredAt`, `firstLoginAt`, `lastLoginAt`, `createdAt`, `updatedAt` |
-| `tenants/{t}/candidates/{id}` | `tenantId`, `personal`, `contact` (+`whatsappDigits`), `interest`, `availability`, `experience`, `education`, `profile`, `resume`, `consent`, `protocol`, `status`, `score`, `scoreBreakdown`, `createdAt`, `updatedAt`, `evaluation` |
-| `tenants/{t}/jobs/{id}` | `id`, `label`, `active` |
+| `tenants/{t}/candidates/{id}` | `tenantId`, `personal`, `contact` (+`whatsappDigits`), `interest`, `availability`, `experience`, `education`, `profile`, `resume`, `consent`, `protocol`, `status`, `score`, `scoreBreakdown`, `createdAt`, `updatedAt`, `evaluation` — **nunca** contém `behavioralProfile`/`behavioralProfileConsent` (ver abaixo) |
+| `tenants/{t}/candidates/{c}/behavioralProfile/data` | `tenantId`, `candidateId`, `profile` (`threeWords`, `emotionalBalance`, `lifeWheel`, `workAnimal`, `constructiveFeedback`, `conflictManagement`, `emotionalControl`, `filledAt`), `consent` (`accepted`, `acceptedAt`, `policyVersion`), `createdAt` — leitura só owner/admin/rh |
+| `tenants/{t}/candidates/{c}/evaluations/{id}` | `type: "behavioral_profile"`, `questionKey` (opcional — ausente = observação geral), `interviewerNotes`, `evaluatorId`, `evaluatorName`, `createdAt`, `updatedAt` — histórico imutável, leitura só owner/admin/rh |
+| `tenants/{t}/jobs/{id}` | `id`, `label`, `active`, `behavioralScreeningSettings` (opcional — substitui a config geral só para esta vaga) |
 | `tenants/{t}/statusHistory/{id}` | `candidateId`, `status`, `previousStatus`, `changedAt`, `changedBy`, `changedByUid`, `note` |
 | `tenants/{t}/evaluations/{id}` | `candidateId`, campos da avaliação, `updatedBy`, `updatedAt` |
 | `tenants/{t}/scoringSettings/default` | `weights`, `updatedAt`, `updatedBy` |
 | `tenants/{t}/settings/general` | `heroTitle`, `heroSubtitle`, `initialMessage`, `privacyPolicyText`, `talentPoolRetentionMonths`, `whatsappGenericMessage`, `whatsappInterviewMessage`, `updatedAt`, `updatedBy` |
+| `tenants/{t}/settings/behavioralScreening` | `enabled`, `threeWords`/`emotionalBalance`/`lifeWheel`/`workAnimal`/`constructiveFeedback`/`conflictManagement`/`emotionalControl` (cada um `{enabled, required}`), `interviewerNotesEnabled`, `updatedAt`, `updatedBy` |
 | `tenants/{t}/auditLogs/{id}` | `actorUid`, `actorName`, `action`, `targetType`, `targetId`, `details`, `createdAt`. Ações do fluxo de convite: `user_invited`, `invite_resent`, `password_reset_requested_by_admin`, `invite_canceled`, `user_activated`, `user_deactivated`, `role_changed`, além das já existentes (`brand_updated`, `portal_settings_updated`, `scoring_weights_updated`, `candidate_deleted`, ações do superadmin etc.) |
 | `platformAdmins/{uid}` | `uid`, `email`, `name`, `active`, `createdAt` |
 | `userIndex/{uid}` | `tenantId` |
 | `plans/{planId}` | `planId`, `name`, `price`, `billingPeriod`, `maxUsers`, `maxBranches`, `maxCandidatesPerMonth`, `reportsEnabled`, `csvExportEnabled`, `scoringEnabled`, `talentBankEnabled`, `customDomainEnabled`, `active` |
 
 Nenhum índice composto do Firestore é necessário: todas as consultas usadas são de
-campo único (`orderBy('createdAt')`, `where('candidateId', '==', …)`, etc.);
-filtros, buscas, ordenações e relatórios são calculados no cliente sobre a lista
-completa de candidatos do tenant. `firestore.indexes.json` permanece vazio.
+campo único (`orderBy('createdAt')`, `where('candidateId', '==', …)`, etc.), incluindo
+a listagem de observações do RH sobre perfil comportamental
+(`listInterviewerNotes`, um `orderBy('createdAt')` simples); filtros, buscas,
+ordenações e relatórios são calculados no cliente sobre a lista completa de candidatos
+do tenant. `firestore.indexes.json` permanece vazio.
 
 ## 17. Testes de regras (Firebase Emulator Suite)
 
@@ -719,6 +728,75 @@ público para leitura mas não para escrita.
 > de confiar 100% no isolamento de currículos, valide manualmente esse caso específico
 > contra um projeto Firebase real (fazer login como um usuário do tenant e confirmar que
 > o download do próprio currículo funciona) — ver checklist abaixo.
+
+## 18. Triagem emocional e perfil comportamental
+
+Seção **opcional** do formulário público (desativada por padrão em todo tenant novo),
+usada apenas como apoio à entrevista. Nunca gera diagnóstico psicológico, eliminação
+automática nem entra na pontuação (`src/lib/scoring.ts` não referencia nenhum campo
+desta seção). Cobre: teste das três palavras, autoavaliação de equilíbrio emocional,
+mini roda da vida adaptada, "quem sou eu no trabalho", crítica construtiva, gestão de
+conflitos e controle emocional — ver os títulos/textos exatos em
+`src/pages/Application/steps/StepBehavioral.tsx`.
+
+### Como ativar por empresa
+
+Em `/app/configuracoes` → card **"Triagem emocional e perfil comportamental"**:
+1. Marque **"Ativar a seção Perfil comportamental no formulário de candidatura"**.
+2. Para cada uma das 7 perguntas, escolha **Desativada**, **Opcional** ou **Obrigatória**.
+3. Opcionalmente, marque **"Mostrar a área privada 'Observações do entrevistador'"**.
+4. Salve. A etapa passa a aparecer no formulário público deste tenant na próxima
+   candidatura iniciada (o rascunho de uma candidatura já em andamento no navegador do
+   candidato só reflete a mudança quando o número de etapas é recalculado — ver
+   `ApplicationForm.tsx`, que corrige automaticamente o passo atual se ele ficar fora
+   dos limites).
+
+Gravado em `tenants/{tenantId}/settings/behavioralScreening` — documento de leitura
+pública (mesma regra de `settings/general`, já que só contém flags de
+ativado/obrigatório, nunca dados de candidatos) e escrita restrita a owner/admin.
+
+### Como configurar por vaga
+
+Em `/app/configuracoes`, na lista **"Áreas de interesse (cargos)"**, cada vaga tem um
+botão **"Triagem: geral"/"Triagem: customizada"**. Ao clicar, um modal permite definir
+uma configuração própria para aquela vaga (mesma grade de perguntas) ou clicar em
+**"Usar configuração geral"** para voltar a seguir a configuração da empresa.
+
+Prioridade de resolução (`resolveBehavioralScreeningSettings` em
+`src/types/behavioralProfile.ts`): **1. configuração da vaga** (se definida, substitui
+inteiramente a da empresa — não é mesclada campo a campo) **> 2. configuração geral da
+empresa > 3. padrão da plataforma** (seção inteira desativada). No formulário público, a
+vaga usada para essa resolução é a **área de maior interesse** já escolhida na etapa 3
+(`interest.mainAreaOfInterest`).
+
+### Onde e como as respostas são gravadas
+
+As respostas do candidato **nunca** viram campos do documento principal
+`tenants/{t}/candidates/{c}` — ficam em `tenants/{t}/candidates/{c}/behavioralProfile/data`,
+uma subcoleção separada. Isso é proposital: o Firestore só consegue restringir leitura
+por **documento inteiro**, nunca por campo dentro de um documento — como a leitura geral
+da ficha do candidato (`hasTenantAccess`) inclui o papel `viewer`, a única forma de
+garantir que `viewer`, outro tenant ou o próprio candidato depois do envio nunca leiam
+essas respostas é mantê-las num documento à parte, com sua própria regra de leitura
+restrita a `owner`/`admin`/`rh` (ver `firestore.rules`). O mesmo vale para as observações
+do RH (`tenants/{t}/candidates/{c}/evaluations/{id}`, campo `type: "behavioral_profile"`),
+usadas tanto pela observação por pergunta quanto pela área geral "Observações do
+entrevistador" (via um campo opcional `questionKey`) — cada gravação cria um documento
+novo, nunca sobrescreve o anterior (histórico imutável).
+
+### Painel do RH
+
+Na ficha do candidato (`/app/candidatos/:id`), owner/admin/rh veem uma seção **"Perfil
+comportamental"** com as respostas do candidato, um campo **"Observação do RH"** abaixo
+de cada pergunta respondida e, se habilitada, a área privada **"Observações do
+entrevistador"** com histórico. Candidaturas antigas ou de tenants sem a triagem
+mostram **"Perfil comportamental não preenchido."**, sem gerar erro. `viewer` e
+qualquer outro papel nunca veem esta seção (nem a UI tenta buscar os dados — o gate
+acontece antes da chamada, e as Rules bloqueiam de qualquer forma).
+
+Estas respostas **nunca** aparecem em: dashboard geral, relatórios, listagem resumida
+de candidatos ou exportação CSV padrão — nenhum desses fluxos lê a subcoleção
+`behavioralProfile`/`evaluations` aninhada em nenhum momento.
 
 ## Checklist final de testes
 
@@ -793,6 +871,23 @@ público para leitura mas não para escrita.
 - [ ] `npm run test:rules` passa sem falhas (além do aviso conhecido do emulador de
       Storage, documentado acima).
 
+**Triagem emocional e perfil comportamental**
+- [ ] Empresa com a triagem desativada: a etapa não aparece no formulário público.
+- [ ] Empresa com a triagem ativada: a etapa aparece entre "Currículo" e "Consentimento".
+- [ ] Todas as perguntas configuradas como opcionais: candidato consegue avançar sem
+      responder nenhuma (só o consentimento é sempre obrigatório para avançar da etapa).
+- [ ] Perguntas obrigatórias: candidato não consegue avançar sem preenchê-las.
+- [ ] Configuração específica por vaga substitui a configuração geral corretamente.
+- [ ] Candidato com experiência e candidato buscando o primeiro emprego (o aviso
+      complementar de "crítica construtiva"/"gestão de conflitos" só aparece no segundo caso).
+- [ ] Candidatura antiga sem `behavioralProfile`: ficha mostra "Perfil comportamental
+      não preenchido.", sem erro.
+- [ ] `owner`/`admin`/`rh` veem a seção na ficha do candidato; `viewer` não vê.
+- [ ] Usuário de outro tenant não consegue ler `behavioralProfile`/`evaluations` de um
+      candidato que não é do seu tenant (testar direto por UID de outro tenant).
+- [ ] Observação do RH (por pergunta e geral) grava com responsável, data e histórico.
+- [ ] Nenhuma resposta desta seção aparece na exportação CSV padrão nem no dashboard.
+
 **Geral**
 - [ ] `npm run build` conclui sem erros de TypeScript ou imports quebrados.
 - [ ] `npm run lint` sem erros.
@@ -801,6 +896,12 @@ público para leitura mas não para escrita.
 
 ## Riscos e etapas pendentes
 
+- **`tests/rules/runAll.mjs` (suíte do Emulator Suite) ainda não cobre as novas
+  subcoleções `behavioralProfile`/`evaluations` aninhadas em candidatos** — a
+  verificação de que `viewer`/outro tenant não leem essas respostas foi validada por
+  leitura cuidadosa das regras (mesma técnica de isolamento por documento já usada em
+  outras partes deste arquivo), mas ainda não tem um teste automatizado dedicado;
+  recomendado adicionar antes de um uso extensivo em produção.
 - **Limite de candidaturas por mês (`maxCandidatesPerMonth`) não é bloqueado
   automaticamente**: o formulário público não tem permissão de leitura no Firestore
   para contar candidaturas existentes antes de enviar a sua (por design, para não abrir

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
+  HeartHandshake,
   Palette,
   Plus,
   Save,
   Search,
+  Settings2,
   ShieldAlert,
   Trash2,
 } from 'lucide-react';
@@ -21,18 +23,73 @@ import {
   saveTenantSettings,
   updateTenant,
 } from '@/lib/tenantApi';
+import { getBehavioralScreeningSettings, saveBehavioralScreeningSettings } from '@/lib/behavioralScreeningApi';
 import { deleteCandidateData, listCandidates } from '@/lib/candidatesApi';
 import { defaultScoringWeights, type ScoringWeights } from '@/types/admin';
 import type { Candidate } from '@/types/candidate';
 import type { Tenant, TenantJobArea, TenantSettings } from '@/types/tenant';
 import { defaultTenantSettings } from '@/types/tenant';
+import {
+  BEHAVIORAL_QUESTION_KEYS,
+  BEHAVIORAL_QUESTION_LABELS,
+  PLATFORM_DEFAULT_BEHAVIORAL_SCREENING,
+  type BehavioralQuestionSetting,
+  type BehavioralScreeningSettings,
+} from '@/types/behavioralProfile';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+
+type BehavioralQuestionMode = 'disabled' | 'optional' | 'required';
+
+function modeOfQuestion(setting: BehavioralQuestionSetting): BehavioralQuestionMode {
+  if (!setting.enabled) return 'disabled';
+  return setting.required ? 'required' : 'optional';
+}
+
+function questionFromMode(mode: BehavioralQuestionMode): BehavioralQuestionSetting {
+  if (mode === 'disabled') return { enabled: false, required: false };
+  if (mode === 'required') return { enabled: true, required: true };
+  return { enabled: true, required: false };
+}
+
+type BehavioralDraft = Omit<BehavioralScreeningSettings, 'updatedAt' | 'updatedBy'>;
+
+/** Grade de perguntas reutilizada tanto na configuração geral quanto na customização por vaga. */
+function BehavioralQuestionsGrid({
+  draft,
+  onChange,
+}: {
+  draft: BehavioralDraft;
+  onChange: (next: BehavioralDraft) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {BEHAVIORAL_QUESTION_KEYS.map((key) => (
+        <div key={key} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 p-3">
+          <span className="text-sm font-medium text-neutral-700">{BEHAVIORAL_QUESTION_LABELS[key]}</span>
+          <Select
+            className="w-40"
+            value={modeOfQuestion(draft[key])}
+            onChange={(e) =>
+              onChange({ ...draft, [key]: questionFromMode(e.target.value as BehavioralQuestionMode) })
+            }
+          >
+            <option value="disabled">Desativada</option>
+            <option value="optional">Opcional</option>
+            <option value="required">Obrigatória</option>
+          </Select>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const WEIGHT_LABELS: Record<keyof ScoringWeights, string> = {
   easyAccess: 'Fácil acesso ao local de trabalho',
@@ -66,6 +123,13 @@ export function Settings() {
   const [weights, setWeights] = useState<ScoringWeights>(defaultScoringWeights);
   const [savingScoring, setSavingScoring] = useState(false);
 
+  const [behavioralSettings, setBehavioralSettings] = useState<BehavioralDraft>(PLATFORM_DEFAULT_BEHAVIORAL_SCREENING);
+  const [savingBehavioral, setSavingBehavioral] = useState(false);
+
+  const [jobBehavioralTarget, setJobBehavioralTarget] = useState<TenantJobArea | null>(null);
+  const [jobBehavioralDraft, setJobBehavioralDraft] = useState<BehavioralDraft | null>(null);
+  const [savingJobBehavioral, setSavingJobBehavioral] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
@@ -78,11 +142,12 @@ export function Settings() {
   useEffect(() => {
     if (!tenantId) return;
     (async () => {
-      const [tenantData, scoring, settings, jobsData] = await Promise.all([
+      const [tenantData, scoring, settings, jobsData, behavioral] = await Promise.all([
         getTenant(tenantId),
         getScoringSettings(tenantId),
         getTenantSettings(tenantId),
         getTenantJobAreas(tenantId),
+        getBehavioralScreeningSettings(tenantId),
       ]);
       if (tenantData) {
         setTenant(tenantData);
@@ -95,6 +160,7 @@ export function Settings() {
       setWeights(scoring.weights);
       setTenantSettings(settings);
       setJobs(jobsData);
+      setBehavioralSettings(behavioral);
       setLoading(false);
     })();
   }, [tenantId]);
@@ -159,6 +225,50 @@ export function Settings() {
     if (!tenantId) return;
     await deleteTenantJobArea(tenantId, areaId);
     setJobs((prev) => prev.filter((j) => j.id !== areaId));
+  };
+
+  const handleSaveBehavioral = async () => {
+    if (!tenantId) return;
+    setSavingBehavioral(true);
+    try {
+      await saveBehavioralScreeningSettings(tenantId, behavioralSettings, actorName);
+      await logAuditEvent({ tenantId, actorUid: user?.uid ?? '', actorName, action: 'behavioral_screening_settings_updated' });
+      flashSaved('Configuração de triagem comportamental atualizada com sucesso.');
+    } finally {
+      setSavingBehavioral(false);
+    }
+  };
+
+  const openJobBehavioralModal = (area: TenantJobArea) => {
+    setJobBehavioralTarget(area);
+    setJobBehavioralDraft(area.behavioralScreeningSettings ? { ...area.behavioralScreeningSettings } : { ...behavioralSettings });
+  };
+
+  const handleUseGeneralForJob = async () => {
+    if (!tenantId || !jobBehavioralTarget) return;
+    setSavingJobBehavioral(true);
+    try {
+      const updated: TenantJobArea = { ...jobBehavioralTarget, behavioralScreeningSettings: null };
+      await saveTenantJobArea(tenantId, updated);
+      setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
+      setJobBehavioralTarget(null);
+    } finally {
+      setSavingJobBehavioral(false);
+    }
+  };
+
+  const handleSaveJobBehavioral = async () => {
+    if (!tenantId || !jobBehavioralTarget || !jobBehavioralDraft) return;
+    setSavingJobBehavioral(true);
+    try {
+      const payload = { ...jobBehavioralDraft, updatedAt: new Date().toISOString(), updatedBy: actorName };
+      const updated: TenantJobArea = { ...jobBehavioralTarget, behavioralScreeningSettings: payload };
+      await saveTenantJobArea(tenantId, updated);
+      setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
+      setJobBehavioralTarget(null);
+    } finally {
+      setSavingJobBehavioral(false);
+    }
   };
 
   const handleSaveScoring = async () => {
@@ -401,6 +511,12 @@ export function Settings() {
                   <p className="text-xs text-neutral-400">{area.id}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {behavioralSettings.enabled && (
+                    <Button size="sm" variant="outline" onClick={() => openJobBehavioralModal(area)}>
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Triagem: {area.behavioralScreeningSettings ? 'customizada' : 'geral'}
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => handleToggleJob(area)}>
                     {area.active ? 'Desativar' : 'Ativar'}
                   </Button>
@@ -422,6 +538,46 @@ export function Settings() {
               <Plus className="h-4 w-4" /> Adicionar
             </Button>
           </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="flex items-center gap-2 font-bold text-neutral-800">
+            <HeartHandshake className="h-4 w-4" /> Triagem emocional e perfil comportamental
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Seção opcional do formulário público, usada apenas como apoio à entrevista — nunca gera diagnóstico,
+            eliminação automática ou pontuação. Desativada por padrão.
+          </p>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <Checkbox
+            id="behavioralEnabled"
+            label="Ativar a seção Perfil comportamental no formulário de candidatura"
+            checked={behavioralSettings.enabled}
+            onChange={(e) => setBehavioralSettings((s) => ({ ...s, enabled: e.target.checked }))}
+          />
+
+          {behavioralSettings.enabled && (
+            <>
+              <BehavioralQuestionsGrid
+                draft={behavioralSettings}
+                onChange={(next) => setBehavioralSettings(next)}
+              />
+              <Checkbox
+                id="interviewerNotesEnabled"
+                label="Mostrar a área privada &quot;Observações do entrevistador&quot; na ficha do candidato"
+                description="Visível apenas para owner, admin e rh — nunca para o candidato, viewer ou exportação CSV."
+                checked={behavioralSettings.interviewerNotesEnabled}
+                onChange={(e) => setBehavioralSettings((s) => ({ ...s, interviewerNotesEnabled: e.target.checked }))}
+              />
+            </>
+          )}
+
+          <Button onClick={handleSaveBehavioral} loading={savingBehavioral} className="self-start">
+            <Save className="h-4 w-4" /> Salvar triagem comportamental
+          </Button>
         </CardBody>
       </Card>
 
@@ -522,6 +678,32 @@ export function Settings() {
           currículo de <strong>{candidateToDelete?.personal.fullName}</strong>, conforme solicitação
           do titular, em conformidade com a LGPD.
         </p>
+      </Modal>
+
+      <Modal
+        open={!!jobBehavioralTarget}
+        onClose={() => !savingJobBehavioral && setJobBehavioralTarget(null)}
+        title={`Triagem comportamental — ${jobBehavioralTarget?.label ?? ''}`}
+        footer={
+          <>
+            <Button variant="outline" onClick={handleUseGeneralForJob} loading={savingJobBehavioral}>
+              Usar configuração geral
+            </Button>
+            <Button onClick={handleSaveJobBehavioral} loading={savingJobBehavioral}>
+              Salvar customização desta vaga
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-neutral-500">
+            Esta configuração substitui inteiramente a configuração geral da empresa só para candidaturas desta vaga.
+            Clique em &quot;Usar configuração geral&quot; para voltar a seguir a configuração da empresa.
+          </p>
+          {jobBehavioralDraft && (
+            <BehavioralQuestionsGrid draft={jobBehavioralDraft} onChange={setJobBehavioralDraft} />
+          )}
+        </div>
       </Modal>
     </div>
   );
