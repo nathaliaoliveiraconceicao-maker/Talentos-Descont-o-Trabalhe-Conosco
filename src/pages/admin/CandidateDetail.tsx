@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -25,9 +25,25 @@ import {
   updateCandidateStatus,
 } from '@/lib/candidatesApi';
 import { getTenant, getTenantSettings, jobAreaLabel } from '@/lib/tenantApi';
+import { getBehavioralScreeningSettings } from '@/lib/behavioralScreeningApi';
+import {
+  addInterviewerNote,
+  getBehavioralProfile,
+  listInterviewerNotes,
+  type BehavioralProfileRecord,
+  type InterviewerNote,
+} from '@/lib/behavioralProfileApi';
 import type { Candidate, StatusHistoryEntry } from '@/types/candidate';
 import { STATUS_LABELS } from '@/types/candidate';
 import type { TenantSettings } from '@/types/tenant';
+import { WRITE_ROLES } from '@/types/admin';
+import {
+  BEHAVIORAL_QUESTION_LABELS,
+  LIFE_WHEEL_KEYS,
+  LIFE_WHEEL_LABELS,
+  type BehavioralQuestionKey,
+  type BehavioralScreeningSettings,
+} from '@/types/behavioralProfile';
 import { EDUCATION_LEVELS } from '@/data/educationLevels';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +54,68 @@ import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/ui/FormField';
 import { StatusBadge } from '@/components/ui/Badge';
 import { DetailSection, InfoField, InfoFieldFull } from '@/components/admin/DetailSection';
+
+/**
+ * Campo de "Observação do RH" reutilizado tanto por pergunta do perfil
+ * comportamental quanto pela área geral "Observações do entrevistador".
+ * Cada gravação cria um novo documento em
+ * tenants/{t}/candidates/{c}/evaluations (histórico imutável) — nunca
+ * sobrescreve a observação anterior.
+ */
+function BehavioralNoteField({
+  tenantId,
+  candidateId,
+  questionKey,
+  maxLength,
+  existingNote,
+  evaluatorId,
+  evaluatorName,
+  onSaved,
+}: {
+  tenantId: string;
+  candidateId: string;
+  questionKey?: BehavioralQuestionKey;
+  maxLength: number;
+  existingNote?: InterviewerNote;
+  evaluatorId: string;
+  evaluatorName: string;
+  onSaved: () => void;
+}) {
+  const [text, setText] = useState(existingNote?.interviewerNotes ?? '');
+  const [saving, setSaving] = useState(false);
+  const fieldId = `behavioral-note-${questionKey ?? 'general'}`;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await addInterviewerNote(tenantId, candidateId, {
+        interviewerNotes: text,
+        questionKey,
+        evaluatorId,
+        evaluatorName,
+      });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-dashed border-neutral-300 p-3">
+      <FormField label="Observação do RH" htmlFor={fieldId}>
+        <Textarea id={fieldId} rows={2} maxLength={maxLength} showCount value={text} onChange={(e) => setText(e.target.value)} />
+      </FormField>
+      {existingNote && (
+        <p className="mt-1 text-xs text-neutral-400">
+          Última observação de {existingNote.evaluatorName} em {new Date(existingNote.updatedAt).toLocaleString('pt-BR')}
+        </p>
+      )}
+      <Button size="sm" variant="outline" onClick={save} loading={saving} className="mt-2">
+        Salvar observação
+      </Button>
+    </div>
+  );
+}
 
 interface InterviewInfo {
   date?: string;
@@ -104,7 +182,23 @@ export function CandidateDetail() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [behavioralRecord, setBehavioralRecord] = useState<BehavioralProfileRecord | null>(null);
+  const [behavioralNotes, setBehavioralNotes] = useState<InterviewerNote[]>([]);
+  const [behavioralScreeningSettings, setBehavioralScreeningSettings] = useState<BehavioralScreeningSettings | null>(
+    null
+  );
+
   const actorName = admin?.name ?? user?.email ?? 'administrador';
+  // "Perfil comportamental" e observações do entrevistador são restritos a
+  // owner/admin/rh — viewer e usuários de outro tenant nunca chegam a ver
+  // isto (as Firestore Rules já negam a leitura da subcoleção para eles;
+  // este gate na UI evita até tentar buscar).
+  const canViewBehavioral = !!admin && WRITE_ROLES.includes(admin.role);
+
+  const reloadBehavioralNotes = async () => {
+    if (!tenantId || !id) return;
+    setBehavioralNotes(await listInterviewerNotes(tenantId, id));
+  };
 
   const load = async () => {
     if (!id || !tenantId) return;
@@ -132,6 +226,17 @@ export function CandidateDetail() {
       setInterviewTime(c.evaluation?.interviewTime ?? '');
       setInterviewLocation(c.evaluation?.interviewLocation ?? '');
       setInterviewNotes(c.evaluation?.interviewNotes ?? '');
+
+      if (admin && WRITE_ROLES.includes(admin.role)) {
+        const [record, notes, screeningSettings] = await Promise.all([
+          getBehavioralProfile(tenantId, id),
+          listInterviewerNotes(tenantId, id),
+          getBehavioralScreeningSettings(tenantId),
+        ]);
+        setBehavioralRecord(record);
+        setBehavioralNotes(notes);
+        setBehavioralScreeningSettings(screeningSettings);
+      }
     } catch {
       setError('Não foi possível carregar os dados deste candidato.');
     } finally {
@@ -264,6 +369,74 @@ export function CandidateDetail() {
       setDeleteModalOpen(false);
     }
   };
+
+  const behavioralAnswers: { key: BehavioralQuestionKey; title: string; content: ReactNode }[] = [];
+  if (behavioralRecord?.profile.threeWords) {
+    const tw = behavioralRecord.profile.threeWords;
+    behavioralAnswers.push({
+      key: 'threeWords',
+      title: BEHAVIORAL_QUESTION_LABELS.threeWords,
+      content: `${tw.word1}, ${tw.word2}, ${tw.word3}`,
+    });
+  }
+  if (behavioralRecord?.profile.emotionalBalance) {
+    const eb = behavioralRecord.profile.emotionalBalance;
+    behavioralAnswers.push({
+      key: 'emotionalBalance',
+      title: BEHAVIORAL_QUESTION_LABELS.emotionalBalance,
+      content: (
+        <>
+          <p>Nota: {eb.score}/5</p>
+          <p className="mt-1 whitespace-pre-line">{eb.context}</p>
+        </>
+      ),
+    });
+  }
+  if (behavioralRecord?.profile.lifeWheel) {
+    const lw = behavioralRecord.profile.lifeWheel;
+    behavioralAnswers.push({
+      key: 'lifeWheel',
+      title: BEHAVIORAL_QUESTION_LABELS.lifeWheel,
+      content: (
+        <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {LIFE_WHEEL_KEYS.map((k) => (
+            <li key={k}>
+              {LIFE_WHEEL_LABELS[k]}: {lw[k]}/10
+            </li>
+          ))}
+        </ul>
+      ),
+    });
+  }
+  if (behavioralRecord?.profile.workAnimal?.answer) {
+    behavioralAnswers.push({
+      key: 'workAnimal',
+      title: BEHAVIORAL_QUESTION_LABELS.workAnimal,
+      content: behavioralRecord.profile.workAnimal.answer,
+    });
+  }
+  if (behavioralRecord?.profile.constructiveFeedback) {
+    behavioralAnswers.push({
+      key: 'constructiveFeedback',
+      title: BEHAVIORAL_QUESTION_LABELS.constructiveFeedback,
+      content: behavioralRecord.profile.constructiveFeedback,
+    });
+  }
+  if (behavioralRecord?.profile.conflictManagement) {
+    behavioralAnswers.push({
+      key: 'conflictManagement',
+      title: BEHAVIORAL_QUESTION_LABELS.conflictManagement,
+      content: behavioralRecord.profile.conflictManagement,
+    });
+  }
+  if (behavioralRecord?.profile.emotionalControl) {
+    behavioralAnswers.push({
+      key: 'emotionalControl',
+      title: BEHAVIORAL_QUESTION_LABELS.emotionalControl,
+      content: behavioralRecord.profile.emotionalControl,
+    });
+  }
+  const generalInterviewerNote = behavioralNotes.find((n) => !n.questionKey);
 
   return (
     <div className="flex flex-col gap-6 print:gap-3">
@@ -482,6 +655,85 @@ export function CandidateDetail() {
         <InfoFieldFull label="Como agiria com cliente insatisfeito" value={candidate.profile.dissatisfiedCustomerAction} />
         <InfoFieldFull label="Expectativas futuras" value={candidate.profile.futureExpectations} />
       </DetailSection>
+
+      {canViewBehavioral && (
+        <Card className="print:hidden">
+          <CardHeader>
+            <h2 className="font-bold text-neutral-800">Perfil comportamental</h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              As respostas abaixo foram fornecidas pelo candidato e devem ser utilizadas somente como apoio à
+              entrevista. Não constituem diagnóstico psicológico.
+            </p>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-4">
+            {behavioralAnswers.length === 0 ? (
+              <p className="text-sm text-neutral-500">Perfil comportamental não preenchido.</p>
+            ) : (
+              <>
+                <p className="text-xs text-neutral-400">
+                  Preenchido em {behavioralRecord && new Date(behavioralRecord.createdAt).toLocaleString('pt-BR')}
+                </p>
+                {behavioralAnswers.map(({ key, title, content }) => (
+                  <div key={key} className="border-t border-neutral-100 pt-4 first:border-t-0 first:pt-0">
+                    <p className="text-sm font-semibold text-neutral-800">{title}</p>
+                    <div className="mt-1 text-sm text-neutral-700">{content}</div>
+                    {tenantId && candidate && (
+                      <BehavioralNoteField
+                        tenantId={tenantId}
+                        candidateId={candidate.id}
+                        questionKey={key}
+                        maxLength={3000}
+                        existingNote={behavioralNotes.find((n) => n.questionKey === key)}
+                        evaluatorId={user?.uid ?? ''}
+                        evaluatorName={actorName}
+                        onSaved={reloadBehavioralNotes}
+                      />
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {behavioralScreeningSettings?.interviewerNotesEnabled && tenantId && candidate && (
+              <div className="border-t border-neutral-200 pt-4">
+                <h3 className="text-sm font-bold text-neutral-800">Observações do entrevistador</h3>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Área privada, visível apenas para owner, admin e rh — não aparece para o candidato nem é incluída
+                  na exportação CSV padrão.
+                </p>
+                <BehavioralNoteField
+                  tenantId={tenantId}
+                  candidateId={candidate.id}
+                  maxLength={3000}
+                  existingNote={generalInterviewerNote}
+                  evaluatorId={user?.uid ?? ''}
+                  evaluatorName={actorName}
+                  onSaved={reloadBehavioralNotes}
+                />
+                {behavioralNotes.filter((n) => !n.questionKey).length > 1 && (
+                  <details className="mt-2 text-xs text-neutral-500">
+                    <summary className="cursor-pointer font-medium">
+                      Ver histórico ({behavioralNotes.filter((n) => !n.questionKey).length} observações)
+                    </summary>
+                    <ul className="mt-2 flex flex-col gap-2">
+                      {behavioralNotes
+                        .filter((n) => !n.questionKey)
+                        .map((n) => (
+                          <li key={n.id} className="rounded border border-neutral-200 p-2">
+                            <p className="whitespace-pre-line">{n.interviewerNotes}</p>
+                            <p className="mt-1 text-neutral-400">
+                              {n.evaluatorName} · {new Date(n.createdAt).toLocaleString('pt-BR')}
+                            </p>
+                          </li>
+                        ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       <Card className="print:hidden">
         <CardHeader>
