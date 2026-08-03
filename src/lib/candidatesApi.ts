@@ -19,6 +19,7 @@ import { db, storage } from './firebase';
 import { generateProtocol } from './protocol';
 import { calculateScore } from './scoring';
 import { onlyDigits } from './masks';
+import { submitBehavioralProfile } from './behavioralProfileApi';
 import type {
   Candidate,
   CandidateFormData,
@@ -141,7 +142,12 @@ export async function submitCandidate(
   const candidateRef = doc(candidatesCol(tenantId));
   const resume = resumeFile ? await uploadResume(tenantId, candidateRef.id, resumeFile) : null;
 
-  const dataWithResume: CandidateFormData = { ...data, resume };
+  // behavioralProfile/behavioralProfileConsent nunca vão para o documento
+  // principal do candidato — são gravados à parte, depois, numa subcoleção
+  // restrita (ver submitBehavioralProfile). Não entram no cálculo de
+  // pontuação (calculateScore não os referencia) nem no protocolo.
+  const { behavioralProfile, behavioralProfileConsent, ...restData } = data;
+  const dataWithResume: CandidateFormData = { ...restData, resume };
   const { total, breakdown } = calculateScore(dataWithResume, weights);
   const protocol = generateProtocol();
   const nowIso = new Date().toISOString();
@@ -167,6 +173,20 @@ export async function submitCandidate(
   };
 
   await setDoc(candidateRef, payload);
+
+  // Só grava a subcoleção restrita se a seção foi realmente preenchida
+  // (consentimento aceito) — candidaturas de tenants sem a triagem ativada
+  // nunca chegam com behavioralProfileConsent definido. Escrita feita DEPOIS
+  // do candidato pai já existir: a regra de criação deste subdocumento
+  // confere isso com um exists() no candidato.
+  if (behavioralProfileConsent?.accepted) {
+    await submitBehavioralProfile(
+      tenantId,
+      candidateRef.id,
+      { ...behavioralProfile, filledAt: nowIso },
+      behavioralProfileConsent
+    );
+  }
 
   await addDoc(statusHistoryCol(tenantId), {
     candidateId: candidateRef.id,

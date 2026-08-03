@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, ChevronRight, Send } from 'lucide-react';
-import { FormProvider, useCandidateForm, TOTAL_STEPS } from '@/context/FormContext';
+import { FormProvider, useCandidateForm } from '@/context/FormContext';
 import { useTenant } from '@/context/TenantContext';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +9,20 @@ import { Modal } from '@/components/ui/Modal';
 import { checkRecentDuplicate, submitCandidate } from '@/lib/candidatesApi';
 import { getScoringSettings } from '@/lib/settingsApi';
 import { jobAreaLabel } from '@/lib/tenantApi';
-import { validateStep, type Errors } from './validation';
+import { isBehavioralScreeningVisible, resolveBehavioralScreeningSettings } from '@/types/behavioralProfile';
+import {
+  validateAvailability,
+  validateBehavioral,
+  validateConsent,
+  validateContact,
+  validateEducation,
+  validateExperience,
+  validateInterest,
+  validatePersonal,
+  validateProfile,
+  validateResume,
+  type Errors,
+} from './validation';
 import { Step1Personal } from './steps/Step1Personal';
 import { Step2Contact } from './steps/Step2Contact';
 import { Step3Interest } from './steps/Step3Interest';
@@ -19,31 +32,69 @@ import { Step6Education } from './steps/Step6Education';
 import { Step7Profile } from './steps/Step7Profile';
 import { Step8Resume } from './steps/Step8Resume';
 import { Step9Consent } from './steps/Step9Consent';
+import { StepBehavioral } from './steps/StepBehavioral';
 
-const STEP_LABELS = [
-  'Dados pessoais',
-  'Contato',
-  'Área de interesse',
-  'Disponibilidade',
-  'Experiência',
-  'Escolaridade',
-  'Perfil profissional',
-  'Currículo',
-  'Consentimento',
-];
+interface StepDescriptor {
+  label: string;
+  render: (errors: Errors) => JSX.Element;
+  validate: (errors: { data: Parameters<typeof validatePersonal>[0]; resumeFile: File | null }) => Errors;
+}
 
 function ApplicationFormInner() {
   const navigate = useNavigate();
-  const { tenant, jobs } = useTenant();
-  const { data, currentStep, nextStep, prevStep, resumeFile, resetForm } = useCandidateForm();
+  const { tenant, jobs, behavioralScreeningSettings } = useTenant();
+  const { data, currentStep, goToStep, nextStep, prevStep, resumeFile, resetForm } = useCandidateForm();
   const [errors, setErrors] = useState<Errors>({});
   const [showConfirm, setShowConfirm] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // A vaga de maior interesse (já escolhida na etapa 3) pode substituir
+  // inteiramente a configuração geral da empresa para a triagem
+  // comportamental — ver TenantJobArea.behavioralScreeningSettings.
+  const jobOverride = jobs.find((j) => j.id === data.interest.mainAreaOfInterest)?.behavioralScreeningSettings;
+  const resolvedBehavioralSettings = resolveBehavioralScreeningSettings(behavioralScreeningSettings, jobOverride);
+  const behavioralStepVisible = isBehavioralScreeningVisible(resolvedBehavioralSettings);
+
+  const steps: StepDescriptor[] = useMemo(() => {
+    const base: StepDescriptor[] = [
+      { label: 'Dados pessoais', render: (e) => <Step1Personal errors={e} />, validate: ({ data }) => validatePersonal(data) },
+      { label: 'Contato', render: (e) => <Step2Contact errors={e} />, validate: ({ data }) => validateContact(data) },
+      { label: 'Área de interesse', render: (e) => <Step3Interest errors={e} />, validate: ({ data }) => validateInterest(data) },
+      { label: 'Disponibilidade', render: (e) => <Step4Availability errors={e} />, validate: ({ data }) => validateAvailability(data) },
+      { label: 'Experiência', render: (e) => <Step5Experience errors={e} />, validate: ({ data }) => validateExperience(data) },
+      { label: 'Escolaridade', render: (e) => <Step6Education errors={e} />, validate: ({ data }) => validateEducation(data) },
+      { label: 'Perfil profissional', render: (e) => <Step7Profile errors={e} />, validate: ({ data }) => validateProfile(data) },
+      { label: 'Currículo', render: (e) => <Step8Resume errors={e} />, validate: ({ resumeFile }) => validateResume(resumeFile) },
+    ];
+    if (behavioralStepVisible) {
+      base.push({
+        label: 'Perfil comportamental',
+        render: (e) => <StepBehavioral errors={e} settings={resolvedBehavioralSettings} />,
+        validate: ({ data }) => validateBehavioral(data, resolvedBehavioralSettings),
+      });
+    }
+    base.push({ label: 'Consentimento', render: (e) => <Step9Consent errors={e} />, validate: ({ data }) => validateConsent(data) });
+    return base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [behavioralStepVisible]);
+
+  const totalSteps = steps.length;
+
+  // Se a configuração mudar (ou uma etapa antiga persistida no localStorage
+  // ficar acima do total atual), garante que o passo exibido nunca aponte
+  // para fora dos limites.
+  useEffect(() => {
+    if (currentStep > totalSteps) goToStep(totalSteps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalSteps]);
+
+  const activeStepIndex = Math.min(currentStep, totalSteps) - 1;
+  const activeStep = steps[activeStepIndex];
+
   const handleNext = () => {
-    const stepErrors = validateStep(currentStep, data, resumeFile);
+    const stepErrors = activeStep.validate({ data, resumeFile });
     setErrors(stepErrors);
     if (Object.keys(stepErrors).length === 0) {
       nextStep();
@@ -58,7 +109,7 @@ function ApplicationFormInner() {
   };
 
   const handleReviewSubmit = async () => {
-    const stepErrors = validateStep(9, data, resumeFile);
+    const stepErrors = activeStep.validate({ data, resumeFile });
     setErrors(stepErrors);
     if (Object.keys(stepErrors).length > 0) return;
 
@@ -88,40 +139,15 @@ function ApplicationFormInner() {
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return <Step1Personal errors={errors} />;
-      case 2:
-        return <Step2Contact errors={errors} />;
-      case 3:
-        return <Step3Interest errors={errors} />;
-      case 4:
-        return <Step4Availability errors={errors} />;
-      case 5:
-        return <Step5Experience errors={errors} />;
-      case 6:
-        return <Step6Education errors={errors} />;
-      case 7:
-        return <Step7Profile errors={errors} />;
-      case 8:
-        return <Step8Resume errors={errors} />;
-      case 9:
-        return <Step9Consent errors={errors} />;
-      default:
-        return null;
-    }
-  };
-
-  const isLastStep = currentStep === TOTAL_STEPS;
+  const isLastStep = currentStep === totalSteps;
 
   return (
     <div className="container-page max-w-2xl py-10">
       <div id="form-errors-anchor" />
-      <ProgressBar currentStep={currentStep} totalSteps={TOTAL_STEPS} stepLabel={STEP_LABELS[currentStep - 1]} />
+      <ProgressBar currentStep={currentStep} totalSteps={totalSteps} stepLabel={steps[activeStepIndex]?.label} />
 
       <div className="mt-8 rounded-xl2 border border-neutral-200 bg-white p-5 shadow-card sm:p-8">
-        {renderStep()}
+        {activeStep.render(errors)}
       </div>
 
       {submitError && (

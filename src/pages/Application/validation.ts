@@ -1,37 +1,17 @@
 import type { CandidateFormData } from '@/types/candidate';
 import { isAdult, isValidCpf, isValidDate, isValidEmail, isValidPhone, textLengthOk } from '@/lib/validators';
 import { RESUME_ACCEPTED_TYPES, RESUME_MAX_SIZE_BYTES } from '@/lib/candidatesApi';
+import { LIFE_WHEEL_KEYS, type BehavioralScreeningSettings } from '@/types/behavioralProfile';
 
 export type Errors = Record<string, string>;
 
 export const PROFILE_MAX_LENGTH = 600;
+export const BEHAVIORAL_TEXT_MAX_LENGTH = 1500;
+export const EMOTIONAL_BALANCE_CONTEXT_MAX_LENGTH = 1000;
+export const WORK_ANIMAL_MAX_LENGTH = 1000;
+export const THREE_WORDS_MAX_LENGTH = 40;
 
-export function validateStep(step: number, data: CandidateFormData, resumeFile: File | null): Errors {
-  switch (step) {
-    case 1:
-      return validatePersonal(data);
-    case 2:
-      return validateContact(data);
-    case 3:
-      return validateInterest(data);
-    case 4:
-      return validateAvailability(data);
-    case 5:
-      return validateExperience(data);
-    case 6:
-      return validateEducation(data);
-    case 7:
-      return validateProfile(data);
-    case 8:
-      return validateResume(resumeFile);
-    case 9:
-      return validateConsent(data);
-    default:
-      return {};
-  }
-}
-
-function validatePersonal(data: CandidateFormData): Errors {
+export function validatePersonal(data: CandidateFormData): Errors {
   const errors: Errors = {};
   const { personal } = data;
   if (!personal.fullName.trim()) errors['personal.fullName'] = 'Informe seu nome completo.';
@@ -49,7 +29,7 @@ function validatePersonal(data: CandidateFormData): Errors {
   return errors;
 }
 
-function validateContact(data: CandidateFormData): Errors {
+export function validateContact(data: CandidateFormData): Errors {
   const errors: Errors = {};
   const { contact } = data;
   if (!isValidPhone(contact.whatsapp)) errors['contact.whatsapp'] = 'Informe um número de WhatsApp válido com DDD.';
@@ -61,7 +41,7 @@ function validateContact(data: CandidateFormData): Errors {
   return errors;
 }
 
-function validateInterest(data: CandidateFormData): Errors {
+export function validateInterest(data: CandidateFormData): Errors {
   const errors: Errors = {};
   const { interest } = data;
   if (interest.areas.length === 0) errors['interest.areas'] = 'Selecione ao menos uma área de interesse.';
@@ -71,7 +51,7 @@ function validateInterest(data: CandidateFormData): Errors {
   return errors;
 }
 
-function validateAvailability(data: CandidateFormData): Errors {
+export function validateAvailability(data: CandidateFormData): Errors {
   const errors: Errors = {};
   const { availability } = data;
   const anyPeriod =
@@ -86,7 +66,7 @@ function validateAvailability(data: CandidateFormData): Errors {
   return errors;
 }
 
-function validateExperience(data: CandidateFormData): Errors {
+export function validateExperience(data: CandidateFormData): Errors {
   const errors: Errors = {};
   const { experience } = data;
   if (!experience.hasWorkedBefore) {
@@ -121,13 +101,13 @@ function validateExperience(data: CandidateFormData): Errors {
   return errors;
 }
 
-function validateEducation(data: CandidateFormData): Errors {
+export function validateEducation(data: CandidateFormData): Errors {
   const errors: Errors = {};
   if (!data.education.educationLevel) errors['education.educationLevel'] = 'Selecione sua escolaridade.';
   return errors;
 }
 
-function validateProfile(data: CandidateFormData): Errors {
+export function validateProfile(data: CandidateFormData): Errors {
   const errors: Errors = {};
   const { profile } = data;
   const fields: [keyof typeof profile, string][] = [
@@ -147,7 +127,7 @@ function validateProfile(data: CandidateFormData): Errors {
   return errors;
 }
 
-function validateResume(resumeFile: File | null): Errors {
+export function validateResume(resumeFile: File | null): Errors {
   const errors: Errors = {};
   if (!resumeFile) return errors;
   if (!RESUME_ACCEPTED_TYPES.includes(resumeFile.type)) {
@@ -158,7 +138,7 @@ function validateResume(resumeFile: File | null): Errors {
   return errors;
 }
 
-function validateConsent(data: CandidateFormData): Errors {
+export function validateConsent(data: CandidateFormData): Errors {
   const errors: Errors = {};
   if (!data.consent.confirmsTruthfulness) {
     errors['consent.confirmsTruthfulness'] = 'É necessário confirmar que as informações são verdadeiras.';
@@ -166,5 +146,63 @@ function validateConsent(data: CandidateFormData): Errors {
   if (!data.consent.authorizesDataProcessing) {
     errors['consent.authorizesDataProcessing'] = 'É necessário autorizar o tratamento dos dados.';
   }
+  return errors;
+}
+
+/**
+ * Só é chamada quando a etapa "Perfil comportamental" está visível (ver
+ * isBehavioralScreeningVisible) — o consentimento é sempre obrigatório para
+ * avançar dessa etapa; dentro dela, cada pergunta só é obrigatória conforme
+ * a configuração da empresa/vaga (settings.<pergunta>.required).
+ */
+export function validateBehavioral(data: CandidateFormData, settings: BehavioralScreeningSettings): Errors {
+  const errors: Errors = {};
+  if (!data.behavioralProfileConsent?.accepted) {
+    errors['behavioralProfileConsent'] =
+      'É necessário marcar a confirmação para continuar respondendo a esta etapa.';
+  }
+
+  const bp = data.behavioralProfile ?? {};
+
+  if (settings.threeWords.enabled && settings.threeWords.required) {
+    const tw = bp.threeWords;
+    if (!tw?.word1?.trim()) errors['behavioralProfile.threeWords.word1'] = 'Informe a primeira palavra.';
+    if (!tw?.word2?.trim()) errors['behavioralProfile.threeWords.word2'] = 'Informe a segunda palavra.';
+    if (!tw?.word3?.trim()) errors['behavioralProfile.threeWords.word3'] = 'Informe a terceira palavra.';
+  }
+
+  if (settings.emotionalBalance.enabled && settings.emotionalBalance.required) {
+    if (!bp.emotionalBalance?.score) {
+      errors['behavioralProfile.emotionalBalance.score'] = 'Selecione uma nota de 1 a 5.';
+    }
+    if (!bp.emotionalBalance?.context?.trim()) {
+      errors['behavioralProfile.emotionalBalance.context'] = 'Conte o que tem contribuído para essa nota.';
+    }
+  }
+
+  if (settings.lifeWheel.enabled && settings.lifeWheel.required) {
+    LIFE_WHEEL_KEYS.forEach((key) => {
+      if (bp.lifeWheel?.[key] == null) {
+        errors[`behavioralProfile.lifeWheel.${key}`] = 'Selecione uma nota de 0 a 10.';
+      }
+    });
+  }
+
+  if (settings.workAnimal.enabled && settings.workAnimal.required && !bp.workAnimal?.answer?.trim()) {
+    errors['behavioralProfile.workAnimal'] = 'Conte qual animal representa você no ambiente de trabalho.';
+  }
+
+  if (settings.constructiveFeedback.enabled && settings.constructiveFeedback.required && !bp.constructiveFeedback?.trim()) {
+    errors['behavioralProfile.constructiveFeedback'] = 'Conte sobre um momento em que recebeu uma crítica construtiva.';
+  }
+
+  if (settings.conflictManagement.enabled && settings.conflictManagement.required && !bp.conflictManagement?.trim()) {
+    errors['behavioralProfile.conflictManagement'] = 'Conte sobre um conflito que enfrentou e como lidou com ele.';
+  }
+
+  if (settings.emotionalControl.enabled && settings.emotionalControl.required && !bp.emotionalControl?.trim()) {
+    errors['behavioralProfile.emotionalControl'] = 'Descreva uma ocasião em que precisou controlar suas emoções.';
+  }
+
   return errors;
 }
