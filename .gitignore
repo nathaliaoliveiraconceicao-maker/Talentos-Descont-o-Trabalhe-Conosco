@@ -8,6 +8,8 @@ dist-ssr
 
 # Env
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
@@ -15,6 +17,8 @@ dist-ssr
 .firebase
 .firebaserc
 serviceAccountKey.json
+serviceAccountKey.json.json
+*serviceAccount*.json
 firebase-debug.log
 firestore-debug.log
 ui-debug.log

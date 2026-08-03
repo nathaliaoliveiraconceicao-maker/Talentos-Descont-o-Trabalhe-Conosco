@@ -88,7 +88,7 @@ service cloud.firestore {
       allow update: if isSuperAdmin() ||
         (hasTenantRole(tenantId, ['owner', 'admin']) &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['name', 'legalName', 'logoUrl', 'primaryColor', 'secondaryColor',
+           .hasOnly(['name', 'legalName', 'primaryColor', 'secondaryColor',
                      'email', 'phone', 'address', 'city', 'state', 'updatedAt']));
 
       match /settings/{docId} {
@@ -104,9 +104,22 @@ service cloud.firestore {
       match /users/{uid} {
         allow get: if isSuperAdmin() || request.auth.uid == uid || canManageTenant(tenantId);
         allow list: if canManageTenant(tenantId);
-        // Criação/edição só via painel do superadmin (fluxo controlado em
-        // src/lib/superAdminApi.ts) ou Admin SDK — nunca pelo próprio usuário.
-        allow create, update, delete: if isSuperAdmin();
+        // Convidar/gerenciar usuários (criar, mudar papel, ativar/desativar,
+        // cancelar convite) é exclusivo de owner/admin do próprio tenant ou
+        // superadmin — fluxo controlado em src/lib/tenantUsersApi.ts.
+        allow create: if canManageTenant(tenantId);
+        // Além disso, o PRÓPRIO usuário pode atualizar apenas os campos de
+        // rastreamento de convite/login (nunca role, active, email etc.) —
+        // é o que permite registrar o primeiro acesso mesmo para papéis
+        // rh/viewer, que não são owner/admin.
+        allow update: if canManageTenant(tenantId) ||
+          (isActiveTenantMember(tenantId) && request.auth.uid == uid &&
+           request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['invitationStatus', 'passwordConfiguredAt', 'firstLoginAt', 'lastLoginAt', 'updatedAt']));
+        // Excluir usuário é uma ação sensível e rara — mantida exclusiva do
+        // superadmin; o fluxo normal é desativar (active: false), nunca
+        // apagar o documento.
+        allow delete: if isSuperAdmin();
       }
 
       match /candidates/{candidateId} {

@@ -13,6 +13,7 @@
     "create-admin": "tsx scripts/createAdmin.ts",
     "create-superadmin": "tsx scripts/createSuperAdmin.ts",
     "migrate-descontao": "tsx scripts/migrateToTenant.ts",
+    "link-existing-user": "tsx scripts/linkExistingUser.ts",
     "test:rules": "firebase emulators:exec --project demo-talentos-rules-test --only firestore,storage \"node tests/rules/runAll.mjs\""
   },
   "dependencies": {

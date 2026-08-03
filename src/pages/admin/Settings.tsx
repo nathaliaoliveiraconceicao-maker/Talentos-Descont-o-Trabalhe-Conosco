@@ -108,7 +108,7 @@ export function Settings() {
   const actorName = admin?.name ?? user?.email ?? 'administrador';
 
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [brandForm, setBrandForm] = useState({ name: '', logoUrl: '', primaryColor: '', secondaryColor: '' });
+  const [brandForm, setBrandForm] = useState({ name: '', primaryColor: '', secondaryColor: '' });
   const [savingBrand, setSavingBrand] = useState(false);
 
   const [tenantSettings, setTenantSettings] = useState<Omit<TenantSettings, 'updatedAt' | 'updatedBy'>>(
@@ -153,7 +153,6 @@ export function Settings() {
         setTenant(tenantData);
         setBrandForm({
           name: tenantData.name,
-          logoUrl: tenantData.logoUrl ?? '',
           primaryColor: tenantData.primaryColor,
           secondaryColor: tenantData.secondaryColor,
         });
@@ -348,7 +347,8 @@ export function Settings() {
             <Palette className="h-4 w-4" /> Identidade visual
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Nome público, logotipo e cores usadas no seu portal de candidaturas.
+            A plataforma não usa mais logomarca da empresa cliente — sua empresa é identificada pelo nome
+            público abaixo. A identidade visual gráfica (logo, cores gerais) é sempre da VagaHub.
           </p>
         </CardHeader>
         <CardBody className="flex flex-col gap-4">
@@ -358,14 +358,6 @@ export function Settings() {
                 id="brandName"
                 value={brandForm.name}
                 onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
-              />
-            </FormField>
-            <FormField label="URL do logotipo" htmlFor="brandLogo" hint="PNG ou SVG com fundo transparente.">
-              <Input
-                id="brandLogo"
-                value={brandForm.logoUrl}
-                onChange={(e) => setBrandForm({ ...brandForm, logoUrl: e.target.value })}
-                placeholder="https://…"
               />
             </FormField>
             <FormField label="Cor primária" htmlFor="primaryColor">
@@ -479,6 +471,19 @@ export function Settings() {
               rows={3}
               value={tenantSettings.whatsappInterviewMessage}
               onChange={(e) => setTenantSettings({ ...tenantSettings, whatsappInterviewMessage: e.target.value })}
+            />
+          </FormField>
+          <FormField
+            label="Documentos necessários (opcional)"
+            htmlFor="requiredDocumentsText"
+            hint="Exibido como aviso na última etapa do formulário e na página de confirmação. Deixe em branco para não mostrar nada."
+          >
+            <Textarea
+              id="requiredDocumentsText"
+              rows={6}
+              placeholder={'Ex.: 1 foto 3x4, Carteira Profissional, RG, CPF, comprovante de residência…'}
+              value={tenantSettings.requiredDocumentsText ?? ''}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, requiredDocumentsText: e.target.value })}
             />
           </FormField>
           <Button onClick={handleSaveContent} loading={savingContent} className="self-start">

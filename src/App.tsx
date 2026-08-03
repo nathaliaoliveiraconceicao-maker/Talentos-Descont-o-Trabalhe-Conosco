@@ -19,11 +19,13 @@ import { Confirmation } from '@/pages/Application/Confirmation';
 // Painel do cliente ("/app/...")
 import { AdminIndexRedirect } from '@/pages/admin/AdminIndexRedirect';
 import { Login } from '@/pages/admin/Login';
+import { ForgotPassword } from '@/pages/admin/ForgotPassword';
 import { Dashboard } from '@/pages/admin/Dashboard';
 import { CandidatesList } from '@/pages/admin/CandidatesList';
 import { CandidateDetail } from '@/pages/admin/CandidateDetail';
 import { Reports } from '@/pages/admin/Reports';
 import { TalentPool } from '@/pages/admin/TalentPool';
+import { Users } from '@/pages/admin/Users';
 import { Settings } from '@/pages/admin/Settings';
 
 // Painel da plataforma ("/superadmin/...")
@@ -55,6 +57,7 @@ export function App() {
           {/* Painel do cliente */}
           <Route path="/app" element={<AdminIndexRedirect />} />
           <Route path="/app/login" element={<Login />} />
+          <Route path="/app/esqueci-senha" element={<ForgotPassword />} />
           <Route
             element={
               <ProtectedRoute>
@@ -67,6 +70,7 @@ export function App() {
             <Route path="/app/candidatos/:id" element={<CandidateDetail />} />
             <Route path="/app/relatorios" element={<Reports />} />
             <Route path="/app/banco-de-talentos" element={<TalentPool />} />
+            <Route path="/app/usuarios" element={<Users />} />
             <Route path="/app/configuracoes" element={<Settings />} />
           </Route>
 
