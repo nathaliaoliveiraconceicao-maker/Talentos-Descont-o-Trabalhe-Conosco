@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import { FileText, ShieldCheck } from 'lucide-react';
 import { useCandidateForm } from '@/context/FormContext';
 import { useTenant } from '@/context/TenantContext';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -7,7 +7,7 @@ import type { Errors } from '../validation';
 import { StepShell } from './StepShell';
 
 export function Step9Consent({ errors }: { errors: Errors }) {
-  const { tenant } = useTenant();
+  const { tenant, settings } = useTenant();
   const { data, updateSection } = useCandidateForm();
   const { consent } = data;
 
@@ -31,6 +31,16 @@ export function Step9Consent({ errors }: { errors: Errors }) {
           .
         </p>
       </div>
+
+      {settings.requiredDocumentsText?.trim() && (
+        <div className="flex items-start gap-3 rounded-xl2 border border-neutral-200 bg-neutral-50 p-4">
+          <FileText className="mt-0.5 h-5 w-5 shrink-0 text-neutral-500" aria-hidden="true" />
+          <div className="text-sm text-neutral-600">
+            <p className="mb-1 font-semibold text-neutral-800">Documentos necessários, caso seja aprovado(a)</p>
+            <p className="whitespace-pre-line">{settings.requiredDocumentsText}</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <Checkbox

@@ -363,6 +363,19 @@ export function Settings() {
               onChange={(e) => setTenantSettings({ ...tenantSettings, whatsappInterviewMessage: e.target.value })}
             />
           </FormField>
+          <FormField
+            label="Documentos necessários (opcional)"
+            htmlFor="requiredDocumentsText"
+            hint="Exibido como aviso na última etapa do formulário e na página de confirmação. Deixe em branco para não mostrar nada."
+          >
+            <Textarea
+              id="requiredDocumentsText"
+              rows={6}
+              placeholder={'Ex.: 1 foto 3x4, Carteira Profissional, RG, CPF, comprovante de residência…'}
+              value={tenantSettings.requiredDocumentsText ?? ''}
+              onChange={(e) => setTenantSettings({ ...tenantSettings, requiredDocumentsText: e.target.value })}
+            />
+          </FormField>
           <Button onClick={handleSaveContent} loading={savingContent} className="self-start">
             <Save className="h-4 w-4" /> Salvar textos
           </Button>

@@ -60,6 +60,13 @@ export interface TenantSettings {
   talentPoolRetentionMonths: number;
   whatsappGenericMessage: string;
   whatsappInterviewMessage: string;
+  /**
+   * Texto livre (opcional) com os documentos/informações que o candidato
+   * deve providenciar caso seja aprovado — exibido como aviso informativo
+   * na última etapa do formulário de pré-candidatura e na página de
+   * confirmação. Não vira campo obrigatório nem upload: é só um aviso.
+   */
+  requiredDocumentsText?: string;
   updatedAt: string;
   updatedBy: string;
 }
@@ -77,6 +84,7 @@ export const defaultTenantSettings: Omit<TenantSettings, 'updatedAt' | 'updatedB
     'Olá, {{nome}}. Somos da equipe de RH da {{empresa}}. Analisamos sua pré-candidatura e gostaríamos de conversar sobre a próxima etapa do nosso processo seletivo.',
   whatsappInterviewMessage:
     'Olá, {{nome}}. Somos do setor de RH da {{empresa}}. Analisamos sua pré-candidatura e gostaríamos de convidar você para uma entrevista no dia {{data}}, às {{horario}}, em {{local}}. Por favor, confirme o recebimento desta mensagem.',
+  requiredDocumentsText: '',
 };
 
 /** tenants/{tenantId}/jobs/{jobId} — áreas de interesse configuráveis pelo cliente. */

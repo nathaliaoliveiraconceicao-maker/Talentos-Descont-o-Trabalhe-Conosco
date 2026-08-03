@@ -587,7 +587,11 @@ recebidas pelo próprio portal.
   - **Textos do portal**: título/subtítulo de destaque, aviso inicial, texto da política
     de privacidade, prazo de retenção do banco de talentos, mensagens de WhatsApp
     (padrão e de convite para entrevista, com placeholders `{{nome}}`, `{{empresa}}`,
-    `{{data}}`, `{{horario}}`, `{{local}}`).
+    `{{data}}`, `{{horario}}`, `{{local}}`) e **documentos necessários** (texto livre
+    opcional — ex.: foto 3x4, CTPS, RG, CPF, comprovante de residência — exibido como
+    aviso informativo na última etapa do formulário de pré-candidatura e na página de
+    confirmação; não vira upload nem campo obrigatório, é só um aviso do que providenciar
+    caso a pessoa seja aprovada).
   - **Áreas de interesse (cargos)**: lista editável (ativar/desativar/adicionar/excluir)
     usada no formulário público deste tenant.
   - **Pesos do sistema de pontuação**.
