@@ -6,6 +6,8 @@ rules_version = '2';
 //   tenants/{tenantId}                          — tenantId == slug (sem necessidade de query pública)
 //   tenants/{tenantId}/users/{uid}               — usuários (owner/admin/rh/viewer) de um cliente
 //   tenants/{tenantId}/candidates/{candidateId}
+//   tenants/{tenantId}/candidates/{candidateId}/behavioralProfile/data — respostas restritas de perfil comportamental (owner/admin/rh)
+//   tenants/{tenantId}/candidates/{candidateId}/evaluations/{id} — observações internas do RH sobre o perfil comportamental (owner/admin/rh)
 //   tenants/{tenantId}/jobs/{jobId}
 //   tenants/{tenantId}/evaluations/{id}
 //   tenants/{tenantId}/statusHistory/{id}
@@ -117,6 +119,34 @@ service cloud.firestore {
           request.resource.data.contact.whatsapp is string;
         allow read: if hasTenantAccess(tenantId);
         allow update, delete: if canOperateCandidates(tenantId) && (isSuperAdmin() || tenantIsOperational(tenantId));
+
+        // Respostas de "Perfil comportamental" (triagem emocional) — em
+        // subcoleção SEPARADA do candidato de propósito: o Firestore só
+        // restringe leitura por documento inteiro, não por campo dentro de
+        // um documento, então é a única forma de garantir que viewer,
+        // outro tenant, ou o próprio candidato depois do envio nunca leiam
+        // essas respostas, mesmo com a leitura geral do candidato liberada
+        // para todo hasTenantAccess (que inclui viewer). Só owner/admin/rh
+        // leem; o candidato só CRIA (nunca lê, edita ou apaga a própria
+        // resposta), e só depois que o candidato pai já existe.
+        match /behavioralProfile/{docId} {
+          allow create: if
+            exists(/databases/$(database)/documents/tenants/$(tenantId)/candidates/$(candidateId)) &&
+            get(/databases/$(database)/documents/tenants/$(tenantId)/candidates/$(candidateId)).data.tenantId == tenantId;
+          allow read: if isSuperAdmin() || hasTenantRole(tenantId, ['owner', 'admin', 'rh']);
+          allow update, delete: if false; // respostas do candidato são imutáveis
+        }
+
+        // Observações internas do RH sobre o perfil comportamental (por
+        // pergunta e a área geral "Observações do entrevistador") — nunca
+        // visíveis ao candidato, a viewer, nem incluídas na exportação CSV
+        // padrão. Histórico imutável: uma nova observação é sempre um novo
+        // documento, nunca sobrescreve a anterior.
+        match /evaluations/{evaluationId} {
+          allow create: if isSuperAdmin() || hasTenantRole(tenantId, ['owner', 'admin', 'rh']);
+          allow read: if isSuperAdmin() || hasTenantRole(tenantId, ['owner', 'admin', 'rh']);
+          allow update, delete: if false;
+        }
       }
 
       match /statusHistory/{entryId} {
