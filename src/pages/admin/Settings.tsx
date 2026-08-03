@@ -51,7 +51,7 @@ export function Settings() {
   const actorName = admin?.name ?? user?.email ?? 'administrador';
 
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [brandForm, setBrandForm] = useState({ name: '', logoUrl: '', primaryColor: '', secondaryColor: '' });
+  const [brandForm, setBrandForm] = useState({ name: '', primaryColor: '', secondaryColor: '' });
   const [savingBrand, setSavingBrand] = useState(false);
 
   const [tenantSettings, setTenantSettings] = useState<Omit<TenantSettings, 'updatedAt' | 'updatedBy'>>(
@@ -88,7 +88,6 @@ export function Settings() {
         setTenant(tenantData);
         setBrandForm({
           name: tenantData.name,
-          logoUrl: tenantData.logoUrl ?? '',
           primaryColor: tenantData.primaryColor,
           secondaryColor: tenantData.secondaryColor,
         });
@@ -238,7 +237,8 @@ export function Settings() {
             <Palette className="h-4 w-4" /> Identidade visual
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Nome público, logotipo e cores usadas no seu portal de candidaturas.
+            A plataforma não usa mais logomarca da empresa cliente — sua empresa é identificada pelo nome
+            público abaixo. A identidade visual gráfica (logo, cores gerais) é sempre da VagaHub.
           </p>
         </CardHeader>
         <CardBody className="flex flex-col gap-4">
@@ -248,14 +248,6 @@ export function Settings() {
                 id="brandName"
                 value={brandForm.name}
                 onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
-              />
-            </FormField>
-            <FormField label="URL do logotipo" htmlFor="brandLogo" hint="PNG ou SVG com fundo transparente.">
-              <Input
-                id="brandLogo"
-                value={brandForm.logoUrl}
-                onChange={(e) => setBrandForm({ ...brandForm, logoUrl: e.target.value })}
-                placeholder="https://…"
               />
             </FormField>
             <FormField label="Cor primária" htmlFor="primaryColor">

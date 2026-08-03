@@ -11,6 +11,14 @@ export interface Tenant {
   name: string;
   legalName?: string;
   slug: string;
+  /**
+   * @deprecated Campo legado — a plataforma não exibe mais logomarca de
+   * cliente em lugar nenhum (a identidade visual é sempre a da VagaHub; cada
+   * empresa é identificada só pelo nome em texto). Mantido apenas por
+   * compatibilidade com tenants já migrados (ex.: tenants/cliente01 pode
+   * ainda ter esse campo gravado) — não é mais lido nem gravável pela
+   * interface (ver firestore.rules).
+   */
   logoUrl?: string;
   primaryColor: string;
   secondaryColor: string;

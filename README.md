@@ -25,7 +25,8 @@ Poppins (títulos) + Inter (interface), ícones lineares.
 - [3. Executando localmente](#3-executando-localmente)
 - [4. Criando o primeiro superadmin da plataforma](#4-criando-o-primeiro-superadmin-da-plataforma)
 - [5. Cadastrando um novo cliente (mercado)](#5-cadastrando-um-novo-cliente-mercado)
-- [6. Criando usuários de um cliente](#6-criando-usuários-de-um-cliente)
+- [6. Convite e criação de usuários de um cliente](#6-convite-e-criação-de-usuários-de-um-cliente)
+- [Identidade visual e remoção da logo do cliente](#identidade-visual-e-remoção-da-logo-do-cliente)
 - [7. Migrando os dados do Descontão (single-tenant → multi-tenant)](#7-migrando-os-dados-do-descontão-single-tenant--multi-tenant)
 - [8. Populando dados fictícios para teste](#8-populando-dados-fictícios-para-teste)
 - [9. Publicando a aplicação](#9-publicando-a-aplicação)
@@ -90,19 +91,21 @@ Poppins (títulos) + Inter (interface), ícones lineares.
 ├── src/
 │   ├── components/
 │   │   ├── admin/                  # componentes da ficha/lista de candidatos
-│   │   ├── layout/                 # Header, Footer, TenantLogo, AdminLayout,
-│   │   │                             SuperAdminLayout, PublicLayout
+│   │   ├── layout/                 # Header, Footer, Logo (única marca gráfica da
+│   │   │                             plataforma), AdminLayout, SuperAdminLayout, PublicLayout
 │   │   └── ui/                     # componentes reutilizáveis (Button, Card, Input…)
 │   ├── context/                    # AuthContext, TenantContext, FormContext
 │   ├── data/                       # listas estáticas (seed de áreas, escolaridade)
 │   ├── hooks/                      # useLocalStorage, useCandidates, useTenantJobs
 │   ├── lib/                        # firebase.ts, tenantApi, plansApi, superAdminApi,
+│   │                                 tenantUsersApi (convite/gestão de usuários),
 │   │                                 candidatesApi, adminApi, settingsApi, auditLog,
 │   │                                 scoring, csvExport, validators, masks
 │   ├── pages/
 │   │   ├── Application/            # formulário de 9 etapas + confirmação (por tenant)
-│   │   ├── admin/                  # painel do cliente: dashboard, candidatos, ficha,
-│   │   │                             relatórios, banco de talentos, configurações
+│   │   ├── admin/                  # painel do cliente: login, esqueci-senha, dashboard,
+│   │   │                             candidatos, ficha, relatórios, banco de talentos,
+│   │   │                             usuários, configurações
 │   │   └── superadmin/             # painel do superadmin: clientes, planos, assinaturas
 │   ├── router/                     # ProtectedRoute (tenant) e SuperAdminRoute
 │   └── types/                      # tenant, plan, admin, candidate
@@ -226,24 +229,165 @@ Feito inteiramente pela interface, como superadmin:
 4. O portal público do cliente já fica no ar em `/{slug}` — mas sem nenhum usuário
    ainda, é preciso criar o primeiro (próximo passo).
 
-## 6. Criando usuários de um cliente
+## 6. Convite e criação de usuários de um cliente
 
-Também pela interface, como superadmin, em `/superadmin/clientes/{tenantId}` →
-**Criar usuário**: informe nome, e-mail, senha temporária e papel (`owner`, `admin`,
-`rh` ou `viewer`). A criação verifica o limite de usuários do plano do cliente antes de
-prosseguir.
+**O admin/superadmin nunca define, vê, armazena ou envia a senha de um usuário de
+cliente.** Toda criação de usuário (o primeiro de um tenant, ou os seguintes) é um
+**convite**: a pessoa convidada recebe um e-mail e cria a própria senha antes do
+primeiro acesso.
 
-> Como isso funciona sem um backend próprio: o app cria a conta no Firebase
-> Authentication usando um app Firebase **secundário e temporário** (não afeta a sessão
-> do superadmin logado), e grava `userIndex/{uid}` e `tenants/{tenantId}/users/{uid}`
-> usando a sessão do próprio superadmin — essa gravação só é permitida pelas Firestore
-> Rules para quem já é superadmin autenticado, então o passo realmente privilegiado
-> continua protegido no servidor (regras), não no cliente. Ver
-> `src/lib/superAdminApi.ts`.
+### Como o convite funciona por dentro (sem backend próprio)
 
-Para revogar o acesso de alguém sem excluir a conta, edite `active` para `false` no
-documento `tenants/{tenantId}/users/{uid}` (via Console do Firebase, por ora — não há
-tela dedicada de "desativar usuário" nesta versão).
+O Firebase Authentication não tem um e-mail nativo de "convite" — só verificação de
+e-mail, redefinição de senha e alteração de e-mail. O mecanismo usado aqui, e que é o
+padrão real para esse cenário com apenas o client SDK, é:
+
+1. A conta é criada no Firebase Authentication (via um app Firebase **secundário e
+   temporário**, que não afeta a sessão de quem está convidando) com uma senha
+   **aleatória, gerada com `crypto.randomUUID()` e descartada imediatamente** — ela
+   nunca é exibida, retornada, logada ou gravada em lugar nenhum, e ninguém (nem quem
+   convidou) tem como recuperá-la depois.
+2. Em seguida, o app chama `sendPasswordResetEmail` para o mesmo e-mail — esse é,
+   funcionalmente, o e-mail de convite: a pessoa nunca teve senha para "redefinir",
+   mas o link funciona igual, e ela define a senha pela primeira vez ali.
+3. `tenants/{tenantId}/users/{uid}` é gravado com `invitationStatus: "pending"`,
+   `invitedAt`, `invitedBy` e `invitationSentAt`.
+4. Quando a pessoa clica no link e cria a senha, ela é redirecionada para
+   `/app/login`, onde faz login normalmente.
+5. No primeiro login sem bloqueios, o app atualiza `invitationStatus` para
+   `"accepted"`, preenche `passwordConfiguredAt` e `firstLoginAt`, e passa a atualizar
+   `lastLoginAt` em todo login seguinte (`recordLoginBookkeeping` em
+   `src/lib/tenantUsersApi.ts`).
+
+Ver `src/lib/tenantUsersApi.ts` (`inviteTenantUser`, `resendInvite`, `cancelInvite`,
+`toggleUserActive`, `changeUserRole`) para a implementação completa.
+
+### Criar o primeiro usuário de um tenant (superadmin)
+
+No cadastro de um cliente novo (`/superadmin/clientes` → **Cadastrar cliente**), o
+formulário já pede nome, e-mail e papel (`owner` ou `admin`) do **primeiro
+responsável** — o convite é enviado automaticamente assim que o tenant é criado, sem
+pedir senha em nenhum momento. A tela `/superadmin/clientes/{tenantId}` mostra nome,
+e-mail, papel, status do convite, data de envio, data de aceitação e último acesso de
+cada usuário do cliente.
+
+### Convidar usuários seguintes
+
+Pelo painel do próprio cliente, em `/app/usuarios` (visível a qualquer usuário, mas
+só `owner`/`admin` veem o botão **Convidar usuário**), ou pelo superadmin em
+`/superadmin/clientes/{tenantId}` → **Convidar usuário**. Em ambos os casos, o convite
+respeita o limite `maxUsers` do plano do cliente.
+
+### Reenviar convite
+
+Botão **Reenviar convite** (ícone de envelope) na lista de usuários — reenvia o
+mesmo e-mail de definição de senha, atualiza `invitationSentAt` e registra
+`invite_resent` em `auditLogs`. Não cria uma conta nova nem duplica o usuário. Para um
+usuário que **já** tem senha definida (`invitationStatus: "accepted"`), o mesmo botão
+vira "enviar link de redefinição de senha" — é a forma de o admin ajudar alguém que
+esqueceu a senha sem nunca vê-la.
+
+### Cancelar convite
+
+Botão **Cancelar convite** (só aparece para convites `pending`) — define
+`invitationStatus: "canceled"`. A pessoa não consegue mais entrar (mensagem "Este
+convite não está mais ativo…" em `/app/login`) até que um novo convite seja enviado.
+**O usuário nunca é excluído automaticamente.**
+
+### Ativar/desativar e alterar papel
+
+Botões **Desativar/Reativar usuário** (`toggleUserActive`) e alteração de papel
+(`changeUserRole`, disponível via edição direta do documento por ora — sem seletor
+dedicado na lista) — ambos preservam o histórico do usuário e registram o evento em
+`auditLogs`.
+
+### Redefinir senha de um usuário já existente
+
+Qualquer pessoa pode pedir sua própria redefinição em `/app/esqueci-senha` — o app
+sempre mostra a mesma mensagem neutra, sem confirmar nem negar se a conta existe. Um
+admin também pode disparar isso por outra pessoa usando o mesmo botão **Reenviar
+convite/redefinição** descrito acima. **Isso nunca é exigido** de quem já acessa
+normalmente — só acontece quando alguém (o próprio usuário ou um admin em nome dele)
+pede explicitamente.
+
+### Vinculando uma conta que já existe em outro contexto (caso raro)
+
+O SDK do navegador não consegue buscar o UID de uma conta do Firebase Authentication
+pelo e-mail (só o Admin SDK pode, por design de privacidade do Firebase). Na prática:
+- Reenviar convite para alguém do **mesmo tenant** funciona sempre (o UID já está em
+  `tenants/{tenantId}/users`).
+- Convidar um e-mail que já tem conta no Authentication **em outro tenant, ou
+  órfã**, faz `inviteTenantUser` retornar um erro explicando a situação. Para
+  resolver, rode localmente (nunca no navegador):
+
+  ```bash
+  npm run link-existing-user -- <email> <tenantId> <role>
+  ```
+
+  Isso só cria o vínculo (`tenants/{tenantId}/users/{uid}` + `userIndex/{uid}`) —
+  nunca define nem altera a senha da pessoa. Se ela ainda não tiver senha nessa
+  conta, envie um convite normalmente depois (botão "Reenviar convite").
+
+### Configuração manual necessária no Firebase Console
+
+O texto do e-mail de convite/redefinição (assunto, corpo, botão) é controlado pelo
+**modelo de e-mail do Firebase**, que o client SDK não consegue personalizar via
+código — é preciso editar manualmente em **Firebase Console → Authentication →
+Templates (Modelos) → Password reset (Redefinição de senha)**:
+
+- **Assunto sugerido**: "Crie sua senha de acesso à VagaHub"
+- **Corpo sugerido**: mencionar que a pessoa foi convidada para acessar a VagaHub e
+  gerenciar os processos seletivos da empresa (nome do tenant), com um botão "Criar
+  minha senha" e um aviso para ignorar o e-mail caso não reconheça o convite.
+- **URL de ação (action URL)**: o app já passa `url: '<origin>/app/login'` em todo
+  `sendPasswordResetEmail`/convite — confirme em **Authentication → Settings →
+  Authorized domains** que o domínio de produção (`vagahub.vercel.app`) está
+  autorizado, senão o link do e-mail falha.
+
+Sem essa configuração manual, o convite ainda funciona (o link leva à página padrão
+de redefinição de senha do Firebase, e depois redireciona para `/app/login`), só não
+tem o texto/marca customizados descritos acima.
+
+### Compatibilidade com usuários já existentes
+
+Contas criadas antes deste fluxo (ex.: `supermercadodescontao.patricia@gmail.com`)
+não têm `invitationStatus` gravado — em todo o app isso é tratado como
+`"accepted"` (nunca como bloqueado por um campo que nunca existiu nelas). O UID, o
+e-mail e o histórico de acesso dessas contas nunca são alterados por este fluxo.
+
+## Identidade visual e remoção da logo do cliente
+
+A plataforma **não exibe mais logomarca de nenhuma empresa cliente**, em lugar nenhum
+(portal público, formulário, confirmação, painel do cliente, dashboard, relatórios,
+ficha do candidato, e-mails, superadmin, cartões/listagens de tenants etc.). A única
+marca gráfica exibida em toda a aplicação é a **logo da VagaHub** (`<Logo />`,
+`public/vagahub-logo.svg`); cada empresa é identificada apenas pelo **nome em texto**
+configurado no tenant (`tenant.name`, com fallback `"Empresa"` se algum dia estiver
+vazio — hoje o campo é obrigatório na criação do tenant). Não há avatar com iniciais,
+círculo com letra, ícone simulando logo nem imagem institucional automática.
+
+O que foi alterado:
+- `src/components/layout/Header.tsx` — mostra `<Logo />` (VagaHub) + `tenant.name` em
+  texto, em vez do antigo `<TenantLogo />` (removido).
+- `src/pages/admin/Settings.tsx` — removido o campo "URL do logotipo" da seção
+  Identidade visual; mantido nome público e cores.
+- `storage.rules` — `tenants/{tenantId}/branding/{fileName}` agora nega **toda**
+  escrita (`allow write: if false`), ou seja, não é mais possível enviar/trocar um
+  logotipo de cliente pela interface, mesmo por engenharia reversa da UI.
+- `firestore.rules` — `logoUrl` foi removido da lista de campos que o próprio tenant
+  pode autoeditar em `tenants/{tenantId}`.
+
+O que foi **preservado por compatibilidade** (nenhum dado apagado):
+- O campo `logoUrl` continua existindo no tipo `Tenant` (`src/types/tenant.ts`,
+  marcado `@deprecated`) e no documento Firestore de tenants que já tinham um valor
+  gravado (ex.: `tenants/cliente01.logoUrl`, herdado da migração do Descontão) — só
+  não é mais lido nem gravável pela UI.
+- Nenhum arquivo em `tenants/{tenantId}/branding/` no Storage é excluído
+  automaticamente. Se algum tenant já tiver enviado um arquivo ali antes desta
+  mudança, ele continua existindo e publicamente legível (a regra de leitura
+  permanece `allow read: if true`) até ser removido **manualmente** pelo Console do
+  Firebase Storage, depois de validar que nada mais depende dele — não há prazo nem
+  automação para essa limpeza.
 
 ## 7. Migrando os dados do Descontão (single-tenant → multi-tenant)
 
@@ -373,12 +517,18 @@ página do cliente. Quando `suspended`, `canceled` ou `active: false`:
     `scoringSettings`, `jobAreas`) ficam com `allow read, write: if false` para o
     cliente — só acessíveis via Admin SDK (scripts), que ignora as regras.
 - **Sem `serviceAccountKey` no frontend**: todas as operações privilegiadas (criar
-  superadmin, migrar dados, seed) rodam em scripts Node (`scripts/`) usando o Admin SDK,
-  nunca no código que roda no navegador. `serviceAccountKey.json` está no
-  `.gitignore` e nunca deve ser commitado.
-- **Criação de usuário de cliente sem backend**: ver a explicação em
-  [Criando usuários de um cliente](#6-criando-usuários-de-um-cliente) — o passo
-  privilegiado é sempre validado pelas Rules, não pelo cliente.
+  superadmin, migrar dados, seed, vincular usuário existente) rodam em scripts Node
+  (`scripts/`) usando o Admin SDK, nunca no código que roda no navegador.
+  `serviceAccountKey.json`/`serviceAccountKey.json.json`/`*serviceAccount*.json`,
+  `.env` e `.env.*` (exceto `.env.example`) estão no `.gitignore` e nunca devem ser
+  commitados.
+- **Nenhuma senha de cliente passa pelo admin/superadmin**: ver
+  [Convite e criação de usuários de um cliente](#6-convite-e-criação-de-usuários-de-um-cliente).
+  A senha nunca é armazenada no Firestore, nunca aparece em log, nunca é enviada por
+  e-mail/WhatsApp/tela — só a própria pessoa a define, pelo link oficial do Firebase
+  Authentication. A criação/edição de `tenants/{tenantId}/users/{uid}` é sempre
+  validada pelas Firestore Rules (owner/admin do próprio tenant ou superadmin), nunca
+  apenas pelo cliente.
 - **Firebase App Check**: opcional, ativado automaticamente se
   `VITE_RECAPTCHA_SITE_KEY` estiver definida em `.env` (ver `src/lib/firebase.ts`).
   Requer configuração manual no **Console do Firebase > App Check > Apps > Web >
@@ -400,11 +550,15 @@ página do cliente. Quando `suspended`, `canceled` ou `active: false`:
 Painel usado pelo RH/administração de **um** cliente para analisar as pré-candidaturas
 recebidas pelo próprio portal.
 
-- **`/app/login`** — login por e-mail/senha. Após autenticar, o sistema resolve o
-  tenant do usuário via `userIndex/{uid}` e verifica
-  `tenants/{tenantId}/users/{uid}`: o acesso só é liberado se `active == true`. Uma
-  conta autenticada mas sem vínculo a nenhum tenant (nem superadmin) vê "Acesso não
-  autorizado".
+- **`/app/login`** — login por e-mail/senha, com link "Esqueci minha senha" e aviso
+  para quem recebeu um convite. Após autenticar, o sistema resolve o tenant do
+  usuário via `userIndex/{uid}` e verifica `tenants/{tenantId}/users/{uid}`: o acesso
+  só é liberado se `active == true`, o convite não estiver `canceled` e a empresa
+  estiver operacional (ativa e assinatura não suspensa/cancelada) — cada bloqueio tem
+  uma mensagem específica. Uma conta autenticada mas sem vínculo a nenhum tenant (nem
+  superadmin) vê "Acesso não autorizado".
+- **`/app/esqueci-senha`** — pede o e-mail e envia o link de redefinição pelo Firebase;
+  sempre mostra a mesma mensagem neutra, sem confirmar nem negar se a conta existe.
 - **`/app/dashboard`** — cards com total de candidatos, por status, últimos 7 dias e mês
   atual, além de gráficos por função, bairro, experiência e disponibilidade — tudo
   restrito ao próprio tenant.
@@ -419,8 +573,17 @@ recebidas pelo próprio portal.
   em CSV (padrão x completa, essa última incluindo avaliações/observações internas).
 - **`/app/banco-de-talentos`** — candidatos com status "Banco de talentos", com aviso de
   proximidade do prazo de retenção (configurável) e opção de reativar ou excluir.
+- **`/app/usuarios`** — lista os usuários do próprio tenant com status do convite
+  (pendente/aceito/cancelado), data de envio e último acesso. `owner`/`admin` podem
+  convidar (**Convidar usuário**), reenviar convite/link de redefinição, cancelar
+  convite, copiar o link do portal de acesso e ativar/desativar usuários — sempre
+  restrito ao próprio tenant e ao limite de usuários do plano. Ver
+  [seção 6](#6-convite-e-criação-de-usuários-de-um-cliente).
 - **`/app/configuracoes`** — customização do próprio tenant:
-  - **Identidade visual**: nome público, URL do logotipo, cor primária/secundária.
+  - **Identidade visual**: nome público e cor primária/secundária. **Não há mais
+    upload/URL de logomarca da empresa** — a plataforma exibe sempre a logo da
+    VagaHub, e cada empresa é identificada só pelo nome público em texto (ver
+    [Identidade visual e remoção da logo do cliente](#identidade-visual-e-remoção-da-logo-do-cliente)).
   - **Textos do portal**: título/subtítulo de destaque, aviso inicial, texto da política
     de privacidade, prazo de retenção do banco de talentos, mensagens de WhatsApp
     (padrão e de convite para entrevista, com placeholders `{{nome}}`, `{{empresa}}`,
@@ -441,8 +604,10 @@ Painel usado pela equipe da plataforma para administrar todos os clientes.
   baixar documentos).
 - **`/superadmin/clientes`** — lista com busca; cadastro de novo cliente.
 - **`/superadmin/clientes/:tenantId`** — dados do cliente (nome, razão social, contato),
-  plano, status de assinatura, vencimento, ativar/suspender, usuários do cliente e
-  criação de novos usuários.
+  plano, status de assinatura, vencimento, ativar/suspender, e a lista de usuários do
+  cliente (nome, e-mail, papel, status do convite, data de envio, data de aceitação,
+  último acesso) com as mesmas ações de convite/reenvio/cancelamento/ativação do
+  painel do cliente — ver [seção 6](#6-convite-e-criação-de-usuários-de-um-cliente).
 - **`/superadmin/planos`** — CRUD dos planos (limites e feature flags); botão para
   semear os 3 planos padrão (Starter/Pro/Enterprise) na primeira configuração.
 - **`/superadmin/assinaturas`** — visão focada em assinatura: status, vencimento (com
@@ -506,15 +671,15 @@ Campos principais por coleção:
 
 | Coleção | Campos principais |
 | --- | --- |
-| `tenants/{tenantId}` | `tenantId`, `slug`, `name`, `legalName`, `logoUrl`, `primaryColor`, `secondaryColor`, `email`, `phone`, `address`, `city`, `state`, `active`, `planId`, `subscriptionStatus`, `subscriptionStartedAt`, `subscriptionEndsAt`, `createdAt`, `updatedAt` |
-| `tenants/{t}/users/{uid}` | `uid`, `tenantId`, `email`, `name`, `role` (`owner`\|`admin`\|`rh`\|`viewer`), `active`, `createdAt` |
+| `tenants/{tenantId}` | `tenantId`, `slug`, `name`, `legalName`, `logoUrl` (⚠️ legado, não usado pela UI — ver seção de identidade visual), `primaryColor`, `secondaryColor`, `email`, `phone`, `address`, `city`, `state`, `active`, `planId`, `subscriptionStatus`, `subscriptionStartedAt`, `subscriptionEndsAt`, `createdAt`, `updatedAt` |
+| `tenants/{t}/users/{uid}` | `uid`, `tenantId`, `email`, `name`, `role` (`owner`\|`admin`\|`rh`\|`viewer`), `active`, `invitationStatus` (`pending`\|`accepted`\|`expired`\|`canceled`, opcional — ausente = tratado como `accepted`), `invitedAt`, `invitedBy`, `invitationSentAt`, `passwordConfiguredAt`, `firstLoginAt`, `lastLoginAt`, `createdAt`, `updatedAt` |
 | `tenants/{t}/candidates/{id}` | `tenantId`, `personal`, `contact` (+`whatsappDigits`), `interest`, `availability`, `experience`, `education`, `profile`, `resume`, `consent`, `protocol`, `status`, `score`, `scoreBreakdown`, `createdAt`, `updatedAt`, `evaluation` |
 | `tenants/{t}/jobs/{id}` | `id`, `label`, `active` |
 | `tenants/{t}/statusHistory/{id}` | `candidateId`, `status`, `previousStatus`, `changedAt`, `changedBy`, `changedByUid`, `note` |
 | `tenants/{t}/evaluations/{id}` | `candidateId`, campos da avaliação, `updatedBy`, `updatedAt` |
 | `tenants/{t}/scoringSettings/default` | `weights`, `updatedAt`, `updatedBy` |
 | `tenants/{t}/settings/general` | `heroTitle`, `heroSubtitle`, `initialMessage`, `privacyPolicyText`, `talentPoolRetentionMonths`, `whatsappGenericMessage`, `whatsappInterviewMessage`, `updatedAt`, `updatedBy` |
-| `tenants/{t}/auditLogs/{id}` | `actorUid`, `actorName`, `action`, `targetType`, `targetId`, `details`, `createdAt` |
+| `tenants/{t}/auditLogs/{id}` | `actorUid`, `actorName`, `action`, `targetType`, `targetId`, `details`, `createdAt`. Ações do fluxo de convite: `user_invited`, `invite_resent`, `password_reset_requested_by_admin`, `invite_canceled`, `user_activated`, `user_deactivated`, `role_changed`, além das já existentes (`brand_updated`, `portal_settings_updated`, `scoring_weights_updated`, `candidate_deleted`, ações do superadmin etc.) |
 | `platformAdmins/{uid}` | `uid`, `email`, `name`, `active`, `createdAt` |
 | `userIndex/{uid}` | `tenantId` |
 | `plans/{planId}` | `planId`, `name`, `price`, `billingPeriod`, `maxUsers`, `maxBranches`, `maxCandidatesPerMonth`, `reportsEnabled`, `csvExportEnabled`, `scoringEnabled`, `talentBankEnabled`, `customDomainEnabled`, `active` |
@@ -583,6 +748,32 @@ público para leitura mas não para escrita.
 - [ ] Tenant com assinatura suspensa: leitura continua funcionando, mas ações de escrita
       (mudar status, avaliar, excluir) são bloqueadas pelas regras.
 
+**Convite e primeiro acesso**
+- [ ] Convidar um e-mail novo cria a conta, envia o e-mail e mostra a mensagem de
+      confirmação exata ("Convite enviado para…").
+- [ ] Convidar um e-mail já cadastrado no mesmo tenant reenvia o convite em vez de
+      duplicar o usuário.
+- [ ] Convidar um e-mail que já existe em outro tenant mostra o erro explicando
+      `npm run link-existing-user`, em vez de falhar silenciosamente.
+- [ ] Reenviar convite atualiza `invitationSentAt` sem criar conta nova.
+- [ ] Cancelar convite bloqueia o login com a mensagem exata, sem excluir o usuário.
+- [ ] Criar a senha pelo link do e-mail e logar redireciona para `/app/dashboard`,
+      marca `invitationStatus: "accepted"`, preenche `passwordConfiguredAt`/`firstLoginAt`.
+- [ ] Login seguinte atualiza `lastLoginAt` sem re-executar o bookkeeping de primeiro acesso.
+- [ ] Usuário `active: false` vê a mensagem exata de acesso desativado.
+- [ ] Empresa suspensa/inativa mostra a mensagem exata de acesso suspenso, mesmo com
+      usuário ativo e convite aceito.
+- [ ] `/app/esqueci-senha` sempre mostra a mesma mensagem neutra, com e-mail existente
+      ou não.
+- [ ] `supermercadodescontao.patricia@gmail.com` continua logando normalmente, sem
+      nenhum bloqueio novo (sem `invitationStatus` gravado = tratado como aceito).
+
+**Identidade visual (sem logo de cliente)**
+- [ ] Nenhuma tela lista acima exibe logo, avatar com iniciais ou ícone de marca do
+      cliente — só a logo da VagaHub e o nome da empresa em texto.
+- [ ] Um tenant sem nenhum dado de marca configurado ainda renderiza corretamente
+      (layout não quebra na ausência de logo).
+
 **Painel do superadmin (`/superadmin`)**
 - [ ] `/superadmin` redireciona corretamente conforme sessão.
 - [ ] Cadastrar cliente cria `tenants/{slug}` com settings e jobs padrão já semeados, e
@@ -633,9 +824,22 @@ público para leitura mas não para escrita.
 - **`npm run seed` ainda popula as coleções legadas**, não um tenant específico — útil
   só combinado com `npm run migrate-descontao`, ou precisa ser adaptado manualmente para
   popular um tenant novo diretamente em `tenants/{tenantId}/candidates`.
-- **Sem tela de "desativar usuário" no painel do cliente/superadmin** — hoje é feito
-  editando `active` diretamente no Console do Firebase.
 - **`scripts/createAdmin.ts` (legado)** ainda escreve na coleção antiga `admins/{uid}`,
   não em `tenants/{tenantId}/users` — mantido só para compatibilidade com o fluxo antigo
-  de migração; o caminho recomendado para criar usuários de um cliente é sempre o painel
-  do superadmin (seção 6) ou, para o próprio superadmin, `npm run create-superadmin`.
+  de migração; o caminho recomendado para criar/convidar usuários de um cliente é
+  sempre o painel do superadmin/cliente (seção 6) ou, para o próprio superadmin,
+  `npm run create-superadmin`.
+- **Alterar o papel (`role`) de um usuário** hoje só tem função pronta
+  (`changeUserRole` em `src/lib/tenantUsersApi.ts`) mas sem um seletor dedicado na
+  lista de `/app/usuarios`/`/superadmin/clientes/:tenantId` — editar diretamente pelo
+  Console do Firebase ou estender a UI é o caminho por ora.
+- **Texto do e-mail de convite depende de configuração manual** no Firebase Console
+  (Authentication → Templates → Password reset) — sem isso, o convite ainda funciona,
+  mas com o texto/assunto padrão do Firebase em vez do sugerido para a VagaHub. Ver
+  [seção 6](#6-convite-e-criação-de-usuários-de-um-cliente).
+- **`expired` (status de convite) não é definido automaticamente por nenhum job** —
+  o valor existe no tipo (`InvitationStatus`) e na UI, mas nada marca um convite
+  `pending` antigo como `expired` sozinho (o link de redefinição do Firebase expira
+  por conta própria depois de um tempo, mas o Firestore continua mostrando
+  `"pending"` até alguém cancelar/reenviar). Uma Cloud Function agendada resolveria
+  isso — fora do escopo deste projeto, que não usa backend próprio.

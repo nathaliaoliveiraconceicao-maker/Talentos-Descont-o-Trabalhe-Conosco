@@ -1,8 +1,8 @@
 /**
- * Logo da PLATAFORMA (VagaHub) — usada no login/painel /app/* (antes de
- * resolver o tenant do usuário) e em /superadmin/*. Para a logo de um tenant
- * específico nas páginas públicas "/{slug}/...", use <TenantLogo /> em vez
- * deste.
+ * Logo da VagaHub — é a ÚNICA marca gráfica exibida em toda a plataforma
+ * (portal público de cada tenant, painel do cliente e painel do
+ * superadmin). Empresas clientes não têm mais logomarca própria: cada uma é
+ * identificada apenas pelo nome em texto (tenant.name).
  */
 export function Logo({ className = 'h-12' }: { className?: string }) {
   return (
