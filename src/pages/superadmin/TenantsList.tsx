@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, Eye, Plus, Search } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { createTenant, isValidSlug, listTenants, slugify } from '@/lib/tenantApi';
 import { listPlans } from '@/lib/plansApi';
+import { inviteTenantUser } from '@/lib/tenantUsersApi';
 import type { Tenant } from '@/types/tenant';
 import { SUBSCRIPTION_STATUS_LABELS } from '@/types/tenant';
 import type { Plan } from '@/types/plan';
+import type { TenantRole } from '@/types/admin';
+import { TENANT_ROLE_LABELS } from '@/types/admin';
 import { Spinner } from '@/components/ui/Spinner';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -14,9 +18,19 @@ import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Modal } from '@/components/ui/Modal';
 
-const emptyForm = { name: '', slug: '', email: '', planId: '' };
+const emptyForm = {
+  name: '',
+  slug: '',
+  email: '',
+  planId: '',
+  responsibleName: '',
+  responsibleEmail: '',
+  responsibleRole: 'owner' as TenantRole,
+};
 
 export function TenantsList() {
+  const { user, platformAdmin } = useAuth();
+  const actorName = platformAdmin?.name ?? user?.email ?? 'superadmin';
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,9 +83,20 @@ export function TenantsList() {
       setFormError('Slug inválido. Use letras minúsculas, números e hífens (3 a 60 caracteres).');
       return;
     }
+    if (!form.responsibleName.trim() || !form.responsibleEmail.trim()) {
+      setFormError('Preencha nome e e-mail do responsável — o convite é enviado automaticamente.');
+      return;
+    }
     setCreating(true);
     try {
-      await createTenant(form);
+      const tenant = await createTenant(form);
+      await inviteTenantUser({
+        tenantId: tenant.tenantId,
+        name: form.responsibleName.trim(),
+        email: form.responsibleEmail,
+        role: form.responsibleRole,
+        invitedBy: actorName,
+      });
       setModalOpen(false);
       await load();
     } catch (err) {
@@ -208,6 +233,40 @@ export function TenantsList() {
               ))}
             </Select>
           </FormField>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Primeiro responsável — recebe o convite automaticamente
+            </p>
+            <div className="flex flex-col gap-4">
+              <FormField label="Nome do responsável" htmlFor="responsibleName" required>
+                <Input
+                  id="responsibleName"
+                  value={form.responsibleName}
+                  onChange={(e) => setForm((f) => ({ ...f, responsibleName: e.target.value }))}
+                />
+              </FormField>
+              <FormField label="E-mail do responsável" htmlFor="responsibleEmail" required>
+                <Input
+                  id="responsibleEmail"
+                  type="email"
+                  value={form.responsibleEmail}
+                  onChange={(e) => setForm((f) => ({ ...f, responsibleEmail: e.target.value }))}
+                />
+              </FormField>
+              <FormField label="Papel" htmlFor="responsibleRole" required>
+                <Select
+                  id="responsibleRole"
+                  value={form.responsibleRole}
+                  onChange={(e) => setForm((f) => ({ ...f, responsibleRole: e.target.value as TenantRole }))}
+                >
+                  <option value="owner">{TENANT_ROLE_LABELS.owner}</option>
+                  <option value="admin">{TENANT_ROLE_LABELS.admin}</option>
+                </Select>
+              </FormField>
+            </div>
+          </div>
+
           {formError && <p className="text-sm font-medium text-red-600">{formError}</p>}
         </div>
       </Modal>

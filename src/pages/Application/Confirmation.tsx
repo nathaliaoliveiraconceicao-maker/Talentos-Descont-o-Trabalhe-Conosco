@@ -1,11 +1,11 @@
 import { Link, Navigate, useLocation } from 'react-router-dom';
-import { CheckCircle2, Copy, Home } from 'lucide-react';
+import { CheckCircle2, Copy, FileText, Home } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useTenant } from '@/context/TenantContext';
 
 export function Confirmation() {
-  const { tenant } = useTenant();
+  const { tenant, settings } = useTenant();
   const location = useLocation();
   const protocol = (location.state as { protocol?: string } | null)?.protocol;
   const [copied, setCopied] = useState(false);
@@ -60,6 +60,16 @@ export function Confirmation() {
       <p className="text-xs text-neutral-400">
         Guarde este número. Ele pode ser solicitado pela nossa equipe em contatos futuros.
       </p>
+
+      {settings.requiredDocumentsText?.trim() && (
+        <div className="flex w-full items-start gap-3 rounded-xl2 border border-neutral-200 bg-neutral-50 p-4 text-left">
+          <FileText className="mt-0.5 h-5 w-5 shrink-0 text-neutral-500" aria-hidden="true" />
+          <div className="text-sm text-neutral-600">
+            <p className="mb-1 font-semibold text-neutral-800">Documentos necessários, caso seja aprovado(a)</p>
+            <p className="whitespace-pre-line">{settings.requiredDocumentsText}</p>
+          </div>
+        </div>
+      )}
 
       <Link to={`/${tenant.slug}`}>
         <Button variant="outline">

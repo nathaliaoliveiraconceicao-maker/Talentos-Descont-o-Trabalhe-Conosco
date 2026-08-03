@@ -11,6 +11,14 @@ export interface Tenant {
   name: string;
   legalName?: string;
   slug: string;
+  /**
+   * @deprecated Campo legado — a plataforma não exibe mais logomarca de
+   * cliente em lugar nenhum (a identidade visual é sempre a da VagaHub; cada
+   * empresa é identificada só pelo nome em texto). Mantido apenas por
+   * compatibilidade com tenants já migrados (ex.: tenants/cliente01 pode
+   * ainda ter esse campo gravado) — não é mais lido nem gravável pela
+   * interface (ver firestore.rules).
+   */
   logoUrl?: string;
   primaryColor: string;
   secondaryColor: string;
@@ -52,6 +60,13 @@ export interface TenantSettings {
   talentPoolRetentionMonths: number;
   whatsappGenericMessage: string;
   whatsappInterviewMessage: string;
+  /**
+   * Texto livre (opcional) com os documentos/informações que o candidato
+   * deve providenciar caso seja aprovado — exibido como aviso informativo
+   * na última etapa do formulário de pré-candidatura e na página de
+   * confirmação. Não vira campo obrigatório nem upload: é só um aviso.
+   */
+  requiredDocumentsText?: string;
   updatedAt: string;
   updatedBy: string;
 }
@@ -69,6 +84,7 @@ export const defaultTenantSettings: Omit<TenantSettings, 'updatedAt' | 'updatedB
     'Olá, {{nome}}. Somos da equipe de RH da {{empresa}}. Analisamos sua pré-candidatura e gostaríamos de conversar sobre a próxima etapa do nosso processo seletivo.',
   whatsappInterviewMessage:
     'Olá, {{nome}}. Somos do setor de RH da {{empresa}}. Analisamos sua pré-candidatura e gostaríamos de convidar você para uma entrevista no dia {{data}}, às {{horario}}, em {{local}}. Por favor, confirme o recebimento desta mensagem.',
+  requiredDocumentsText: '',
 };
 
 /** tenants/{tenantId}/jobs/{jobId} — áreas de interesse configuráveis pelo cliente. */

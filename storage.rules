@@ -45,10 +45,15 @@ service firebase.storage {
     }
 
     match /tenants/{tenantId}/branding/{fileName} {
-      // Logotipos precisam ser publicamente acessíveis (exibidos no portal
-      // público do cliente), mas só o próprio tenant/superadmin pode enviar.
+      // A plataforma não usa mais logomarca de cliente em lugar nenhum — a
+      // identidade visual exibida é sempre a da VagaHub, e cada empresa é
+      // identificada só pelo nome em texto (tenant.name). Uploads novos
+      // ficam desativados; arquivos já enviados por algum tenant antes desta
+      // mudança são preservados (não excluídos automaticamente) e continuam
+      // legíveis publicamente até serem removidos manualmente após validação
+      // (ver README).
       allow read: if true;
-      allow write: if hasTenantAccess(tenantId);
+      allow write: if false;
     }
 
     // Nega tudo o mais por padrão.

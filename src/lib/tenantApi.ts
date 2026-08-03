@@ -103,7 +103,6 @@ export async function createTenant(input: CreateTenantInput): Promise<Tenant> {
     address: input.address ?? '',
     city: input.city ?? '',
     state: input.state ?? '',
-    logoUrl: '',
     primaryColor: input.primaryColor ?? '#146c94',
     secondaryColor: input.secondaryColor ?? '#d32f2b',
     active: true,

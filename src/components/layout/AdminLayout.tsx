@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Archive, LayoutDashboard, LineChart, LogOut, Menu, Settings, Users, X } from 'lucide-react';
+import { Archive, LayoutDashboard, LineChart, LogOut, Menu, Settings, UserCog, Users, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getTenant } from '@/lib/tenantApi';
 import { TENANT_ROLE_LABELS } from '@/types/admin';
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: '/app/candidatos', label: 'Candidatos', icon: Users },
   { to: '/app/relatorios', label: 'Relatórios', icon: LineChart },
   { to: '/app/banco-de-talentos', label: 'Banco de Talentos', icon: Archive },
+  { to: '/app/usuarios', label: 'Usuários', icon: UserCog },
   { to: '/app/configuracoes', label: 'Configurações', icon: Settings },
 ];
 

@@ -2,7 +2,16 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getPlatformAdmin, getTenantUser, getUserIndex } from '@/lib/adminApi';
+import { getTenant } from '@/lib/tenantApi';
+import { recordLoginBookkeeping } from '@/lib/tenantUsersApi';
+import { isTenantOperational } from '@/types/tenant';
 import type { AdminUser, PlatformAdmin } from '@/types/admin';
+
+/**
+ * Motivo pelo qual um usuário autenticado (Firebase Auth ok) ainda não pode
+ * entrar no painel. `null` significa "sem problema, pode entrar".
+ */
+export type AuthIssue = 'inactive' | 'invitation_canceled' | 'tenant_suspended' | null;
 
 interface AuthContextValue {
   user: User | null;
@@ -16,7 +25,8 @@ interface AuthContextValue {
   /** Usuário de um tenant específico (RH/admin/owner/viewer daquele cliente). */
   admin: AdminUser | null;
   tenantId: string | null;
-  /** true quando autenticado, ativo e vinculado a um tenant (qualquer papel). */
+  authIssue: AuthIssue;
+  /** true quando autenticado, ativo, vinculado a um tenant e sem nenhum bloqueio. */
   isAuthorized: boolean;
 
   login: (email: string, password: string) => Promise<void>;
@@ -61,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [platformAdmin, setPlatformAdmin] = useState<PlatformAdmin | null>(null);
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [authIssue, setAuthIssue] = useState<AuthIssue>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -68,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPlatformAdmin(null);
       setAdmin(null);
       setTenantId(null);
+      setAuthIssue(null);
 
       if (firebaseUser) {
         try {
@@ -77,9 +89,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             const index = await getUserIndex(firebaseUser.uid);
             if (index?.tenantId) {
-              const tenantUser = await getTenantUser(index.tenantId, firebaseUser.uid);
+              const [tenantUser, tenant] = await Promise.all([
+                getTenantUser(index.tenantId, firebaseUser.uid),
+                getTenant(index.tenantId),
+              ]);
               setAdmin(tenantUser);
               setTenantId(index.tenantId);
+
+              if (tenantUser) {
+                // Documentos antigos (ex.: a usuária Patrícia) não têm
+                // invitationStatus — tratamos como 'accepted', nunca como
+                // bloqueado por um campo que nunca existiu neles.
+                const invitationStatus = tenantUser.invitationStatus ?? 'accepted';
+                if (!tenantUser.active) {
+                  setAuthIssue('inactive');
+                } else if (invitationStatus === 'canceled') {
+                  setAuthIssue('invitation_canceled');
+                } else if (tenant && !isTenantOperational(tenant)) {
+                  setAuthIssue('tenant_suspended');
+                } else {
+                  recordLoginBookkeeping(index.tenantId, firebaseUser.uid, {
+                    invitationStatus: tenantUser.invitationStatus,
+                    passwordConfiguredAt: tenantUser.passwordConfiguredAt,
+                    firstLoginAt: tenantUser.firstLoginAt,
+                  }).catch((err) => console.error('[AuthContext] Falha ao registrar bookkeeping de login:', err));
+                }
+              }
             }
           }
         } catch {
@@ -106,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isSuperAdmin = !!platformAdmin && platformAdmin.active === true;
-  const isAuthorized = !!admin && admin.active === true;
+  const isAuthorized = !!admin && admin.active === true && authIssue === null;
 
   return (
     <AuthContext.Provider
@@ -118,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         admin,
         tenantId,
+        authIssue,
         isAuthorized,
         login,
         logout,

@@ -17,7 +17,24 @@ export const WRITE_ROLES: TenantRole[] = ['owner', 'admin', 'rh'];
 /** Papéis com permissão para gerenciar usuários e configurações do tenant. */
 export const MANAGE_ROLES: TenantRole[] = ['owner', 'admin'];
 
-/** tenants/{tenantId}/users/{uid} */
+export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'canceled';
+
+export const INVITATION_STATUS_LABELS: Record<InvitationStatus, string> = {
+  pending: 'Convite pendente',
+  accepted: 'Convite aceito',
+  expired: 'Convite expirado',
+  canceled: 'Convite cancelado',
+};
+
+/**
+ * tenants/{tenantId}/users/{uid}
+ *
+ * Os campos de convite (invitationStatus, invitedAt, ...) são todos
+ * opcionais para manter compatibilidade com usuários criados antes deste
+ * fluxo (ex.: supermercadodescontao.patricia@gmail.com) — um documento sem
+ * invitationStatus é tratado, em todo o app, como já aceito ('accepted'),
+ * nunca como bloqueado.
+ */
 export interface AdminUser {
   uid: string;
   tenantId: string;
@@ -25,7 +42,15 @@ export interface AdminUser {
   name: string;
   role: TenantRole;
   createdAt: string;
+  updatedAt?: string;
   active: boolean;
+  invitationStatus?: InvitationStatus;
+  invitedAt?: string;
+  invitedBy?: string;
+  invitationSentAt?: string;
+  passwordConfiguredAt?: string;
+  firstLoginAt?: string;
+  lastLoginAt?: string;
 }
 
 /** platformAdmins/{uid} — usuários da própria plataforma, com acesso a todos os tenants. */
