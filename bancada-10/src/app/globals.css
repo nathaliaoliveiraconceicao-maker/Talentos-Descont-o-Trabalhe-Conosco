@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-ink antialiased;
+}
+
+::selection {
+  @apply bg-bancada-red text-white;
+}
+
+*:focus-visible {
+  outline: 2px solid #d71920;
+  outline-offset: 2px;
+}
+
+.container-page {
+  @apply mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8;
+}
+
+.prose-b10 h2 {
+  @apply mt-8 font-display text-lg uppercase tracking-wide2 first:mt-0;
+}
+.prose-b10 h3 {
+  @apply mt-6 text-base font-semibold text-ink;
+}
+.prose-b10 p {
+  @apply mt-3 text-sm leading-relaxed text-ink-muted;
+}
+.prose-b10 ul {
+  @apply mt-3 list-disc space-y-1 pl-5 text-sm text-ink-muted;
+}
+.prose-b10 a {
+  @apply text-ink underline;
+}
+.prose-b10 strong {
+  @apply text-ink;
+}
+
+.skip-link {
+  @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-ink focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
